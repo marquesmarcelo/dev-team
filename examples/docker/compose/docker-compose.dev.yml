@@ -1,0 +1,46 @@
+# Overlay de desenvolvimento — use junto com docker-compose.yaml:
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.dev.yml up --build
+#
+# Após o primeiro build (ou quando não mudar dependências), inicie sem --build:
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.dev.yml up
+#
+# Quando adicionar dependências (go.mod ou package.json), rebuild apenas o serviço afetado:
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.dev.yml build backend
+#   docker compose -f docker-compose.yaml -f docker-compose.dev.yml build frontend
+#
+# Para produção, use docker-compose.yaml sem overlay.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend:/app
+      - /app/tmp                   # diretório de build do air, não montar do host
+    environment:
+      GIN_MODE: debug
+      DEV_SEM_AUTH: "true"         # bypass de autenticação — apenas em dev, nunca em produção
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000"
+      # Em dev, migrations estão no caminho original dentro do volume montado.
+      # Em produção (Dockerfile padrão), são copiadas para ./migrations.
+      MIGRATIONS_PATH: ./internal/adapter/postgres/migrations
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend:/app
+      # Volume nomeado isola node_modules do Linux dentro do container,
+      # evitando conflito com node_modules do host (Windows/Mac).
+      - frontend_node_modules:/app/node_modules
+    environment:
+      # Next.js dev server precisa ouvir em 0.0.0.0 para ser acessível fora do container.
+      HOSTNAME: "0.0.0.0"
+
+volumes:
+  frontend_node_modules:

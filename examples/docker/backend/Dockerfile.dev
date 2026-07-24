@@ -1,0 +1,11 @@
+# Dockerfile.dev — backend Go + Gin
+# Usado APENAS pelo docker-compose.dev.yml — nunca em produção.
+# O código entra via volume montado (./backend:/app), não copiado aqui.
+# air detecta mudanças em .go e recompila automaticamente dentro do container.
+
+FROM golang:1.23-alpine
+WORKDIR /app
+# Instalar air para hot-reload
+RUN go install github.com/air-verse/air@latest
+EXPOSE 3001
+CMD ["air"]
