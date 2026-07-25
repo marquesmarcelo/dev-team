@@ -1,5 +1,10 @@
 # Princípios de comportamento dos agentes
 
+> Este projeto tem **18 agentes especializados** em `.claude/agents/`.
+> **Nunca usar agente genérico quando existe um especializado para a tarefa.**
+> Consulte a seção "Uso obrigatório dos agentes especializados" neste arquivo
+> para o mapa completo de tarefas → agente correto.
+>
 > Derivados das observações de Andrej Karpathy sobre armadilhas comuns de
 > LLMs em tarefas de código. Aplicam-se a **todos os agentes** deste projeto,
 > em qualquer tarefa. São complementares às regras específicas abaixo —
@@ -1069,6 +1074,53 @@ misturadas com as funcionalidades principais no mesmo grupo.
 Ao atingir um desses gatilhos, registrar a decisão como ADR em
 `specs/<feature>/design.md` antes de implementar — nunca adotar o padrão
 "porque parece a coisa certa a fazer" sem o gatilho objetivo presente.
+
+## Uso obrigatório dos agentes especializados
+
+**Nunca usar agente genérico (general-purpose) quando existe um agente
+especializado para a tarefa.** Os agentes deste projeto foram construídos
+com contexto, regras e skills específicas — um agente genérico ignora tudo
+isso e entrega resultado de qualidade inferior.
+
+```
+❌ Errado: usar agente genérico para implementar uma feature
+✅ Correto: usar dev-fullstack (com as skills da stack carregadas)
+
+❌ Errado: usar agente genérico para revisar segurança
+✅ Correto: usar security-reviewer (checklist OWASP integrado)
+
+❌ Errado: usar agente genérico para escrever um spec.md
+✅ Correto: usar analista-requisitos (wireframe ASCII + GWT + exemplos)
+```
+
+**Mapa de tarefas → agente correto:**
+
+| Tarefa | Agente |
+|---|---|
+| Coletar requisitos, criar spec.md | `analista-requisitos` |
+| Projetar UX, filtros, acessibilidade | `ux-designer` |
+| Identificar oportunidades de IA | `ai-consultor` |
+| Definir arquitetura, design.md, tasks.md | `arquiteto` |
+| Implementar feature (banco + backend + frontend) | `dev-fullstack` |
+| Implementar feature de IA/LLM | `dev-ia` |
+| Implementar autenticação e ABAC | `dev-auth` |
+| Implementar auditoria | `dev-auditoria` |
+| Implementar servidor MCP | `dev-mcp` |
+| Configurar Docker Compose e ambiente local | `dev-docker-compose` |
+| Gerar manifests K8s, CI/CD e ArgoCD | `dev-kubernetes` |
+| Validar e consolidar migrations, gerar release.sql | `dba` |
+| Revisar segurança (OWASP) | `security-reviewer` |
+| Revisar qualidade e arquitetura | `code-reviewer` |
+| Executar testes e gerar evidence.md | `qa-tester` |
+| Teste de carga | `load-tester` |
+| Gerar documentação e OpenAPI | `tech-writer` |
+| Auditar projeto existente | `auditor-projeto` |
+
+**Quando um agente encontrar algo que não sabe:**
+O agente especializado pode e deve buscar informação adicional — pesquisar
+na web, ler arquivos do projeto, perguntar ao usuário — **mas continua
+sendo o agente especializado executando a tarefa**. Nunca transferir a
+execução para um agente genérico.
 
 ## Orquestração dos subagents (papel da thread principal)
 
