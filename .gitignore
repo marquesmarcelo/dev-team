@@ -1,0 +1,16 @@
+# Claude Code — arquivos de trabalho local (nunca commitar)
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
+# Ambiente
+.env
+.env.local
+.env.*.local
+
+# Dependências
+node_modules/
+
+# Build
+dist/
+build/

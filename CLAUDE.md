@@ -5,6 +5,12 @@
 > Consulte a seção "Uso obrigatório dos agentes especializados" neste arquivo
 > para o mapa completo de tarefas → agente correto.
 >
+> **Idioma obrigatório: português brasileiro.** Todas as mensagens trocadas
+> com o usuário, perguntas de esclarecimento, relatórios, confirmações de
+> PARE e qualquer outra comunicação devem ser em pt-BR. Código-fonte,
+> nomes de variáveis e comentários técnicos seguem a convenção da stack
+> (inglês é aceitável), mas a conversa com o usuário é sempre em pt-BR.
+>
 > Derivados das observações de Andrej Karpathy sobre armadilhas comuns de
 > LLMs em tarefas de código. Aplicam-se a **todos os agentes** deste projeto,
 > em qualquer tarefa. São complementares às regras específicas abaixo —
@@ -1644,6 +1650,11 @@ esses arquivos.
 
 Raiz do projeto:
 ```gitignore
+# Claude Code — arquivos de trabalho local (nunca commitar)
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
 .env
 .env.*
 !.env.example

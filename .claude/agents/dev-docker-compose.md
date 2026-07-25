@@ -55,7 +55,9 @@ antes de continuar.
 
 - [ ] Dockerfiles dev com volume + hot-reload
 - [ ] docker-compose.yaml sem DEV_SEM_AUTH
-- [ ] .gitignore na raiz, backend e frontend
+- [ ] `.gitignore` na raiz inclui entradas obrigatórias do Claude Code:
+      `.claude/worktrees/`, `.claude/scheduled_tasks.lock`, `.claude/settings.local.json`
+- [ ] `.gitignore` na raiz, backend e frontend (específico por linguagem)
 - [ ] .env.example atualizado (incluindo SYSLOG_SERVER, PROMETHEUS_PUSHGATEWAY_URL, SONAR_TOKEN)
 - [ ] sonar-project.properties na raiz
 - [ ] Pipeline CI com 9 fases
