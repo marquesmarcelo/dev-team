@@ -881,51 +881,129 @@ O spinner substitui o ícone durante o loading — mesma área, sem
 deslocar o layout da tabela. A barra superior dispara automaticamente
 via `fetchWithProgress` (exclusão) ou `startNavigation` (edição).
 
-## APP_ENV — configuração por ambiente
+## APP_ENV — configuração por ambiente (CSP prático para shadcn/ui)
 
-> Regra universal em `CLAUDE.md`. Implementar no `next.config.ts` e
-> no middleware de headers.
+> Regra universal em `CLAUDE.md`. A configuração abaixo é a que
+> **realmente funciona** com Next.js + Tailwind + Radix/shadcn.
+
+### Por que `style-src 'unsafe-inline'` é necessário e aceitável
+
+Tailwind (via `@layer`), Radix UI e shadcn/ui injetam estilos inline em
+runtime — é parte do funcionamento desses frameworks. Remover
+`'unsafe-inline'` do `style-src` quebra a aplicação completamente.
+
+**Isso é um tradeoff aceitável porque:**
+- CSS injection tem vetor de ataque muito mais restrito que JS injection
+- A proteção que importa é no `script-src` — bloquear JS malicioso
+- O CSP abaixo usa **nonce** para scripts, que é a defesa real contra XSS
+
+### Nonce por requisição — proteção real do script-src
+
+Em vez de `'unsafe-inline'` em scripts (que anula a proteção), usar
+nonce criptográfico gerado por request. O Next.js 14+ suporta isso
+nativamente via middleware:
 
 ```typescript
-// next.config.ts
+// middleware.ts (raiz do projeto)
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import crypto from 'crypto'
+
+export function middleware(request: NextRequest) {
+  const isProd = process.env.APP_ENV === 'production'
+
+  if (!isProd) return NextResponse.next()
+
+  // Nonce único por requisição — inviolável mesmo com XSS parcial
+  const nonce = crypto.randomBytes(16).toString('base64')
+
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}'`,   // nonce no lugar de 'unsafe-inline'
+    "style-src 'self' 'unsafe-inline'",     // necessário: Tailwind + Radix injetam estilos em runtime
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ')
+
+  const response = NextResponse.next({
+    request: { headers: new Headers(request.headers) },
+  })
+
+  response.headers.set('Content-Security-Policy', csp)
+  response.headers.set('X-Frame-Options', 'DENY')
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+
+  // Passar o nonce para o layout via header — Next.js lê no server component
+  response.headers.set('x-nonce', nonce)
+
+  return response
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
+```
+
+```typescript
+// app/layout.tsx — ler o nonce e passar para scripts inline
+import { headers } from 'next/headers'
+
+export default async function RootLayout({ children }) {
+  const nonce = (await headers()).get('x-nonce') ?? ''
+
+  return (
+    <html>
+      <body>
+        {children}
+        {/* Scripts inline precisam do nonce — sem ele o CSP bloqueia */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: '' }} />
+      </body>
+    </html>
+  )
+}
+```
+
+```typescript
+// next.config.ts — sem CSP aqui (middleware cuida)
 const isProd = process.env.APP_ENV === 'production'
 
 const nextConfig = {
-  // Source maps apenas em desenvolvimento
-  productionBrowserSourceMaps: false,
+  productionBrowserSourceMaps: false,  // source maps só em dev
 
-  // Headers de segurança
+  // Em dev: sem CSP — não quebrar HMR, DevTools e hot reload
+  // Em prod: CSP via middleware (nonce por request)
   async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: isProd ? [
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
-              "font-src 'self'",
-              "connect-src 'self'",
-              "frame-ancestors 'none'",
-            ].join('; ')
-          },
-          { key: 'X-Frame-Options',           value: 'DENY' },
-          { key: 'X-Content-Type-Options',    value: 'nosniff' },
-          { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=()' },
-          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
-        ] : [
-          // Development: sem CSP restritivo — não quebrar HMR e DevTools
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-        ],
-      },
-    ]
+    if (isProd) return []  // middleware já seta os headers
+    return [{
+      source: '/(.*)',
+      headers: [
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+      ],
+    }]
   },
 }
 export default nextConfig
+```
+
+### O que o CSP bloqueia vs. o que aceita
+
+```
+✅ Bloqueia:     JS inline sem nonce (<script>código malicioso</script>)
+✅ Bloqueia:     JS de domínio externo (cdn.atacante.com/xss.js)
+✅ Bloqueia:     iframes de outros domínios (frame-ancestors 'none')
+⚠️ Aceita:      CSS inline (Tailwind/Radix) — tradeoff consciente
+✅ Mitiga CSS:  sem 'unsafe-eval' + headers X-Frame-Options + HSTS
+```
+
+```bash
+# .env.example
+APP_ENV=development
+NEXT_PUBLIC_APP_ENV=development
 ```
 
 ```typescript

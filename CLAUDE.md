@@ -1795,13 +1795,23 @@ O comportamento da aplicação muda conforme o ambiente:
 **Headers de segurança HTTP obrigatórios em `production`:**
 
 ```
-Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'
+# script-src usa nonce (gerado por request) — nunca 'unsafe-inline'
+Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{NONCE}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'
 X-Frame-Options: DENY
 X-Content-Type-Options: nosniff
 Strict-Transport-Security: max-age=31536000; includeSubDomains
 Referrer-Policy: strict-origin-when-cross-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=()
 ```
+
+**Por que `style-src 'unsafe-inline'` está presente:**
+Tailwind, Radix UI e shadcn/ui injetam estilos inline em runtime —
+é parte do funcionamento desses frameworks. Remover esse permissivo
+quebra a aplicação completamente. É um tradeoff consciente e aceitável
+porque: (a) CSS injection tem vetor de ataque muito mais restrito que
+JS injection, e (b) a proteção real é no `script-src`, que usa nonce
+por requisição. A implementação concreta do nonce está na skill de
+frontend da stack configurada.
 
 > **Nota sobre bloqueio de DevTools:** a detecção/bloqueio de DevTools é
 > uma medida *best-effort* — nenhuma implementação é inviolável, pois o
