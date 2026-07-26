@@ -274,12 +274,12 @@ docker compose run --rm backend ./gradlew test
 - Controllers: `@WebMvcTest` com `@MockBean` do use case.
 - ArchUnit: `@ArchTest` para validar regras de dependência.
 
-## DEV_SEM_AUTH e CORS
+## APP_ENV e CORS
 
 ```yaml
 # application.yml
 app:
-  dev-sem-auth: ${DEV_SEM_AUTH:false}
+  app-env: ${APP_ENV:production}
   cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 ```
 
@@ -289,7 +289,7 @@ app:
 public class DevAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(request, response, chain) {
-        // Bypass: só ativo se DEV_SEM_AUTH=true
+        // Bypass: só ativo se APP_ENV=development
         SecurityContextHolder.getContext().setAuthentication(devAuthentication());
         chain.doFilter(request, response);
     }

@@ -438,8 +438,8 @@ docker compose run --rm backend go run ./cmd/seed
 O `dba` garante que toda migration nova venha acompanhada do seed
 correspondente — não é opcional.
 
-## Variável de bypass de autenticação em desenvolvimento
-`DEV_SEM_AUTH` (booleana, default `false`/ausente). Quando `true`, o
+## Variável de bypass de autenticação e segurança em desenvolvimento
+`APP_ENV`. Quando `development`, o
 middleware de autenticação do Gin deixa passar qualquer requisição sem
 validar token — implementado como um middleware condicional, nunca como
 `if` espalhado em cada handler. Essa variável só pode aparecer no

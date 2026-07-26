@@ -19,8 +19,8 @@ Quando pedido, crie para a stack configurada:
   (dev: `npm run dev` para Next.js, `ng serve --host 0.0.0.0` para Angular)
 - `backend/.dockerignore` + `frontend/.dockerignore`
 - `.gitignore` na raiz + backend + frontend (específico por linguagem)
-- `docker-compose.yaml` (produção: sem volume de código, sem DEV_SEM_AUTH)
-- `docker-compose.dev.yml` (dev: volume montado, DEV_SEM_AUTH=true, CORS aberto)
+- `docker-compose.yaml` (produção: sem volume de código, sem APP_ENV)
+- `docker-compose.dev.yml` (dev: volume montado, APP_ENV=development, CORS aberto)
 - `.env.example` com todas as variáveis documentadas
 - `sonar-project.properties`
 
@@ -35,7 +35,7 @@ Informe o comando para subir:
 
 ## Responsabilidades permanentes
 
-- `docker-compose.yaml`: produção — build completo, sem DEV_SEM_AUTH
+- `docker-compose.yaml`: produção — build completo, sem APP_ENV
 - `docker-compose.dev.yml`: overlay dev com volumes e variáveis de desenvolvimento
 - Manifests K8s (`/deploy/k8s/`) sincronizados com o compose de produção
 - Pipeline CI/CD com fases obrigatórias (nesta ordem):
@@ -54,7 +54,7 @@ antes de continuar.
 ## Checklist
 
 - [ ] Dockerfiles dev com volume + hot-reload
-- [ ] docker-compose.yaml sem DEV_SEM_AUTH
+- [ ] docker-compose.yaml sem APP_ENV
 - [ ] `.gitignore` na raiz inclui entradas obrigatórias do Claude Code:
       `.claude/worktrees/`, `.claude/scheduled_tasks.lock`, `.claude/settings.local.json`
 - [ ] `.gitignore` na raiz, backend e frontend (específico por linguagem)

@@ -236,14 +236,14 @@ docker compose run --rm backend pytest --cov=app
 Use `pytest-asyncio` para use cases assíncronos. Mock os ports via
 `unittest.mock.AsyncMock` ou implementação in-memory.
 
-## DEV_SEM_AUTH e CORS
+## APP_ENV e CORS
 
 ```python
-DEV_SEM_AUTH = os.getenv("DEV_SEM_AUTH", "false").lower() == "true"
+APP_ENV = os.getenv("APP_ENV", "production")
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    if DEV_SEM_AUTH:
+    if APP_ENV == "development":
         return await call_next(request)
     # validar JWT...
 ```

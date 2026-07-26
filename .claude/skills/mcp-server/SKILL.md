@@ -225,7 +225,7 @@ PORT=3002                              # só para transporte SSE
 ```
 
 `API_TOKEN` é um token de serviço com permissões específicas — nunca
-usar token de usuário final, nunca usar `DEV_SEM_AUTH=true` no MCP em produção.
+usar token de usuário final, nunca usar `APP_ENV=development` no MCP em produção.
 
 ## Dockerfiles
 

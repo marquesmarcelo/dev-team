@@ -16,7 +16,7 @@ de autoridade".
 | # | Categoria | Verificar |
 |---|---|---|
 | A01 | Broken Access Control | IDOR via UUID não verificado, ABAC bypassado, rota sem auth, SSRF |
-| A02 | Security Misconfiguration | `DEV_SEM_AUTH` em prod, CORS `*` fora de dev, debug em prod, secret hardcoded |
+| A02 | Security Misconfiguration | `APP_ENV` em prod, CORS `*` fora de dev, debug em prod, secret hardcoded |
 | A03 | Supply Chain Failures | Dependência vulnerável (`govulncheck`/`npm audit`), licença incompatível |
 | A04 | Cryptographic Failures | Senha sem bcrypt/argon2, JWT sem expiração ou com HS256 fraco, dado sensível em log |
 | A05 | Injection | SQL via concatenação (especialmente `ORDER BY` sem allowlist), XSS, command injection |
@@ -28,7 +28,8 @@ de autoridade".
 
 ## Verificações específicas do projeto (CLAUDE.md)
 
-- `DEV_SEM_AUTH` ausente de todo arquivo fora de `docker-compose.dev.yml`
+- `APP_ENV=development` fora do `docker-compose.dev.yml` → 🔴 Crítico
+  (em manifesto K8s, `docker-compose.yml` de produção, ou como default no código)
 - CORS nunca `*` em produção
 - `page_size` com limite máximo (clamp obrigatório)
 - `sort` via allowlist antes do `ORDER BY` — SQL injection mesmo com query parametrizada
@@ -39,6 +40,10 @@ de autoridade".
   Token deve estar em cookie `HttpOnly; Secure; SameSite=Strict`.
   Buscar: `localStorage.setItem`, `localStorage.getItem`, `sessionStorage`
   com qualquer variação de "token", "jwt", "auth" no valor ou chave.
+- **`APP_ENV=production` sem headers de segurança → 🟡 Alto.**
+  Verificar: CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Strict-Transport-Security`, `Referrer-Policy`.
+- **Source maps em produção → 🟡 Alto.** Expõe código-fonte original no browser.
 
 ## Comentários que chegam ao usuário — Crítico
 

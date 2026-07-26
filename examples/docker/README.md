@@ -57,6 +57,6 @@ toda a configuração de postgres, portas, healthchecks, etc.
 | Variável | Dev (`docker-compose.dev.yml`) | Produção |
 |---|---|---|
 | `GIN_MODE` | `debug` | `release` |
-| `DEV_SEM_AUTH` | `true` | **ausente** (jamais `false` — a ausência já desativa) |
+
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | domínios reais |
 | `APP_ENV` | `development` | `production` |

@@ -881,6 +881,88 @@ O spinner substitui o ícone durante o loading — mesma área, sem
 deslocar o layout da tabela. A barra superior dispara automaticamente
 via `fetchWithProgress` (exclusão) ou `startNavigation` (edição).
 
+## APP_ENV — configuração por ambiente
+
+> Regra universal em `CLAUDE.md`. Implementar no `next.config.ts` e
+> no middleware de headers.
+
+```typescript
+// next.config.ts
+const isProd = process.env.APP_ENV === 'production'
+
+const nextConfig = {
+  // Source maps apenas em desenvolvimento
+  productionBrowserSourceMaps: false,
+
+  // Headers de segurança
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: isProd ? [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob:",
+              "font-src 'self'",
+              "connect-src 'self'",
+              "frame-ancestors 'none'",
+            ].join('; ')
+          },
+          { key: 'X-Frame-Options',           value: 'DENY' },
+          { key: 'X-Content-Type-Options',    value: 'nosniff' },
+          { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+        ] : [
+          // Development: sem CSP restritivo — não quebrar HMR e DevTools
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+        ],
+      },
+    ]
+  },
+}
+export default nextConfig
+```
+
+```typescript
+// components/providers/env-guard.tsx — bloqueio best-effort de DevTools em prod
+'use client'
+import { useEffect } from 'react'
+
+export function EnvGuard() {
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_APP_ENV !== 'production') return
+
+    // Best-effort: detectar DevTools abertos pelo delta de tempo
+    // Não é inviolável — o valor real está nos outros controles de segurança
+    const handler = () => {
+      const start = performance.now()
+      // eslint-disable-next-line no-debugger
+      debugger
+      if (performance.now() - start > 100) {
+        document.body.innerHTML = ''
+      }
+    }
+    const interval = setInterval(handler, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return null
+}
+```
+
+```bash
+# .env.example
+APP_ENV=development
+NEXT_PUBLIC_APP_ENV=development   # versão pública para o componente client-side
+```
+
+Em produção o CI injeta `APP_ENV=production` e `NEXT_PUBLIC_APP_ENV=production`.
+
 ## Autenticação — regra de segurança obrigatória
 
 **JWT nunca vai para `localStorage` ou `sessionStorage`.**

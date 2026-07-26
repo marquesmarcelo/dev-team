@@ -1508,7 +1508,7 @@ valida de forma independente.
 
 ### Princípio: funcionar primeiro, proteger depois
 
-Toda funcionalidade é construída **primeiro** com `DEV_SEM_AUTH=true` e
+Toda funcionalidade é construída **primeiro** com `APP_ENV=development` e
 validada pelo dono do produto. A autenticação é adicionada em uma conversa
 separada com o `arquiteto`, que define quais rotas exigem login e qual
 perfil/permissão é necessário.
@@ -1770,7 +1770,51 @@ dentro de um arquivo `.md` e **fica em `specs/<feature>/`** — nunca em
 - `docs/` é reservado apenas para `openapi.yaml` (gerado pelo framework)
 - Nunca gerar diagrama em `/tmp`
 
-## Referências de segurança e qualidade
+### APP_ENV — variável de ambiente obrigatória
+
+Toda aplicação deve ter a variável `APP_ENV` com dois valores possíveis:
+
+```bash
+APP_ENV=development   # ambiente de desenvolvimento
+APP_ENV=production    # ambiente de produção
+```
+
+O comportamento da aplicação muda conforme o ambiente:
+
+| Recurso | `development` | `production` |
+|---|---|---|
+| DevTools do browser | ✅ Liberado | 🔒 Bloqueado (best-effort) |
+| Extensões de browser | ✅ Liberadas | 🔒 Não interferem |
+| HMR (Hot Module Reload) | ✅ Ativo | ❌ Desabilitado |
+| Source maps | ✅ Gerados | ❌ Não gerados |
+| CSP (Content Security Policy) | Relaxado | 🔒 Restritivo |
+| Headers de segurança HTTP | Mínimos | 🔒 Completos |
+| Logs detalhados | ✅ Verboso | ⚠️ Apenas erros |
+| Stack trace em resposta de erro | ✅ Visível | ❌ Oculto |
+
+**Headers de segurança HTTP obrigatórios em `production`:**
+
+```
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+```
+
+> **Nota sobre bloqueio de DevTools:** a detecção/bloqueio de DevTools é
+> uma medida *best-effort* — nenhuma implementação é inviolável, pois o
+> browser é controlado pelo usuário. O valor real está nos outros controles:
+> CSP, ausência de source maps, sem stack trace em erros de produção.
+
+**`.env.example`** deve incluir:
+```bash
+APP_ENV=development   # trocar para production no deploy
+```
+
+A implementação concreta (middleware de headers, configuração de build)
+vem da skill de frontend da stack configurada.
 
 ### Comentários que chegam ao usuário final — proibidos
 
@@ -2105,19 +2149,26 @@ por padrão.
 
 ## Autenticação em desenvolvimento e CORS
 
-- **Variável de bypass de autenticação para desenvolvimento:**
-  `DEV_SEM_AUTH` (booleana). Quando `true`, o backend permite uso de
-  qualquer rota sem exigir autenticação — exclusivamente para
-  desenvolvimento local.
-  - **Regra inegociável:** essa variável só pode existir no
-    `docker-compose.yml` (ambiente local) — nunca em manifesto Kubernetes
-    de produção/staging, nunca com default `true` no código (default
-    deve ser `false`/ausente). O `security-reviewer` verifica isso
-    explicitamente a cada revisão.
-- **CORS configurável por variável de ambiente:** `CORS_ALLOWED_ORIGINS`
-  (lista separada por vírgula). Em desenvolvimento, pode incluir
-  `http://localhost:3000`; em produção, lista explícita de domínios
-  reais — nunca `*` em produção.
+**`APP_ENV` é a única variável que controla comportamentos de segurança.**
+Não existe mais `DEV_SEM_AUTH` ou qualquer outra variável separada —
+tudo é derivado de `APP_ENV=development` vs `APP_ENV=production`.
+
+| Comportamento | `APP_ENV=development` | `APP_ENV=production` |
+|---|---|---|
+| Autenticação obrigatória | ❌ Bypass permitido | ✅ Sempre exigida |
+| CSP e headers de segurança | Relaxados | 🔒 Restritivos |
+| CORS | `localhost:*` liberado | Lista explícita de domínios |
+| DevTools / source maps | ✅ Liberados | 🔒 Bloqueados |
+| Stack trace em erros | ✅ Visível | ❌ Oculto |
+
+**Regras inegociáveis:**
+- `APP_ENV=development` **nunca** aparece em manifesto Kubernetes de staging ou produção
+- `APP_ENV=development` **nunca** tem valor default no código — ausência = `production`
+- O `security-reviewer` verifica isso a cada revisão: `APP_ENV=development` fora do `docker-compose.dev.yml` = 🔴 Crítico
+
+**CORS:** configurável via `CORS_ALLOWED_ORIGINS` (lista separada por vírgula).
+Em `development`: pode incluir `http://localhost:3000`.
+Em `production`: lista explícita de domínios reais — nunca `*`.
 
 ## Docker Compose: dois ambientes, comportamentos distintos
 
@@ -2136,14 +2187,14 @@ por padrão.
   automática dentro do container); Next.js usa `next dev` (padrão, já
   tem HMR nativo) — o processo principal do container é o watcher, não
   o binário compilado estático.
-- Variável `DEV_SEM_AUTH=true` e `CORS_ALLOWED_ORIGINS` liberada para
+- Variável `APP_ENV=development` e `CORS_ALLOWED_ORIGINS` liberada para
   desenvolvimento — presentes apenas aqui, nunca no `docker-compose.yml`.
 - O serviço `migrate` e o serviço de seed também rodam aqui.
 
 ### Regras do `docker-compose.yml` (produção)
 - Sem volume de código — a imagem é auto-contida (build multi-stage já
   copiou o código).
-- Sem `DEV_SEM_AUTH`, sem `CORS_ALLOWED_ORIGINS` permissiva.
+- Sem `APP_ENV`, sem `CORS_ALLOWED_ORIGINS` permissiva.
 - Manifesto Kubernetes usa a mesma imagem produzida pelo Dockerfile
   — o `docker-compose.yml` de produção e o manifesto K8s nunca divergem
   em qual imagem sobem.
@@ -2274,7 +2325,7 @@ próximas features constroem sobre este baseline
 
 ### Migrations: dev vs. produção
 
-**Em desenvolvimento** (`DEV_SEM_AUTH=true`):
+**Em desenvolvimento** (`APP_ENV=development`):
 - Migrations incrementais em `migrations/` — uma por feature
 - Seed pode dropar e recriar o banco para reset rápido
 

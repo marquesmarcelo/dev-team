@@ -61,7 +61,7 @@
 - Versionamento de API: <ex: prefixo `/api/v1`>
 
 ## Variáveis de ambiente padrão (todo projeto)
-- `DEV_SEM_AUTH` — bypass de autenticação, exclusivo de desenvolvimento local
+- `APP_ENV` — bypass de autenticação e segurança, exclusivo de desenvolvimento local
 - `CORS_ALLOWED_ORIGINS` — lista de origens permitidas, por ambiente
 
 ---

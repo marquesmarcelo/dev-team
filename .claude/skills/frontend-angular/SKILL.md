@@ -580,6 +580,83 @@ O spinner substitui o `mat-icon` durante o loading — sem deslocar o
 layout. `HttpClient` dispara a barra superior automaticamente via
 `loadingProgressInterceptor`.
 
+## APP_ENV — configuração por ambiente
+
+> Regra universal em `CLAUDE.md`. Implementar via `environment.ts` e
+> middleware de headers no servidor (Nginx ou backend).
+
+```typescript
+// environments/environment.ts
+export const environment = {
+  production: false,
+  appEnv: 'development' as 'development' | 'production',
+  appName: 'Nome do Sistema',
+  appVersion: 'dev',
+  buildDate: '',
+  gitCommit: '',
+}
+
+// environments/environment.prod.ts
+export const environment = {
+  production: true,
+  appEnv: 'production' as 'development' | 'production',
+  appName: 'Nome do Sistema',
+  appVersion: '${APP_VERSION}',   // substituído pelo CI
+  buildDate: '${BUILD_DATE}',
+  gitCommit: '${GIT_COMMIT}',
+}
+```
+
+```typescript
+// core/guards/env-guard.ts — bloqueio best-effort de DevTools em prod
+import { Injectable } from '@angular/core'
+import { environment } from '../../environments/environment'
+
+@Injectable({ providedIn: 'root' })
+export class EnvGuardService {
+  init(): void {
+    if (environment.appEnv !== 'production') return
+
+    // Best-effort: não é inviolável — valor real está no CSP e ausência de source maps
+    setInterval(() => {
+      const start = performance.now()
+      // eslint-disable-next-line no-debugger
+      debugger
+      if (performance.now() - start > 100) {
+        document.body.innerHTML = ''
+      }
+    }, 1000)
+  }
+}
+```
+
+**Headers de segurança em produção** — configurar no Nginx ou no backend
+que serve o Angular (não no Angular em si, que é SPA estática):
+
+```nginx
+# nginx.conf — bloco location para a aplicação Angular
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'" always;
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+```
+
+```bash
+# .env.example
+APP_ENV=development   # backend lê e passa para o build do Angular via CI
+```
+
+**Build do Angular:**
+```bash
+# Desenvolvimento (HMR ativo, source maps, sem CSP)
+ng serve
+
+# Produção (sem source maps, otimizado)
+ng build --configuration=production
+```
+
 ## Autenticação — regra de segurança obrigatória
 
 **JWT nunca vai para `localStorage` ou `sessionStorage`.**

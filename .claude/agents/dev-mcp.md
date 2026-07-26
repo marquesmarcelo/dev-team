@@ -51,7 +51,7 @@ Siga a skill `mcp-server/SKILL.md` para:
 ### 3. Autenticação do MCP com a API
 
 O MCP server usa um **token de serviço** (`API_TOKEN`) — nunca o token
-do usuário final, nunca `DEV_SEM_AUTH=true`. O token de serviço deve
+do usuário final, nunca `APP_ENV=development`. O token de serviço deve
 ter apenas as permissões necessárias para as tools expostas (princípio
 do menor privilégio). Registre a necessidade de criar este token na
 documentação em `docs/mcp.md`.
@@ -69,7 +69,7 @@ Crie `docs/mcp.md` com:
 - [ ] Tools selecionadas com o usuário (não todos os endpoints)
 - [ ] Descrições das tools claras para o LLM
 - [ ] `mcp/` criado com estrutura da skill
-- [ ] Autenticação via `API_TOKEN` de serviço (sem DEV_SEM_AUTH)
+- [ ] Autenticação via `API_TOKEN` de serviço (sem APP_ENV)
 - [ ] Transporte correto (STDIO ou SSE conforme project.config.md)
 - [ ] Dockerfiles criados e serviço registrado no docker-compose
 - [ ] `.env.example` atualizado

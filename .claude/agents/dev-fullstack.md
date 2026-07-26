@@ -140,13 +140,13 @@ reflete os novos endpoints.
 
 ## Construa já preparado para auth, authz e auditoria
 
-A feature é entregue com `DEV_SEM_AUTH=true` — sem autenticação agora.
+A feature é entregue com `APP_ENV=development` — sem autenticação agora.
 Mas o código já nasce estruturado para receber essas camadas depois,
 sem refatoração:
 
 - **Autenticação:** o handler recebe (e por ora ignora) o contexto de
   usuário. A interface de autorização já existe em `/port` — o use case
-  a chama, mas a implementação retorna `true` enquanto `DEV_SEM_AUTH=true`.
+  a chama, mas a implementação retorna `true` enquanto `APP_ENV=development`.
 - **Autorização ABAC:** o use case não contém `if user.role == "X"`.
   A verificação será injetada via `AuthorizationChecker` (port) quando o
   `dev-auth` implementar. Não antecipe lógica de permissão no código
