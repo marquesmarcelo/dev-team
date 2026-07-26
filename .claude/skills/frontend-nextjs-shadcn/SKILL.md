@@ -881,6 +881,47 @@ O spinner substitui o ícone durante o loading — mesma área, sem
 deslocar o layout da tabela. A barra superior dispara automaticamente
 via `fetchWithProgress` (exclusão) ou `startNavigation` (edição).
 
+## Autenticação — regra de segurança obrigatória
+
+**JWT nunca vai para `localStorage` ou `sessionStorage`.**
+O token é armazenado em cookie `HttpOnly` pelo backend — o frontend
+não toca no token diretamente. O cookie é enviado automaticamente
+pelo browser em cada requisição.
+
+```typescript
+// ❌ PROIBIDO — vulnerável a XSS
+localStorage.setItem('token', jwt)
+const token = localStorage.getItem('token')
+headers: { Authorization: `Bearer ${token}` }
+
+// ✅ CORRETO — cookie HttpOnly gerenciado pelo browser/servidor
+// O frontend não faz nada com o token.
+// O browser envia o cookie automaticamente.
+// O backend lê o JWT do cookie, nunca do header Authorization.
+
+// Login: só chama a API — o backend seta o cookie na resposta
+await fetchWithProgress('/api/auth/login', {
+  method: 'POST',
+  credentials: 'include',   // ← obrigatório para enviar/receber cookies
+  body: JSON.stringify({ email, senha }),
+})
+
+// Todas as requisições autenticadas: credentials: 'include'
+await fetchWithProgress('/api/v1/processos', {
+  credentials: 'include',   // ← cookie enviado automaticamente
+})
+
+// Logout: só chama a API — o backend apaga o cookie
+await fetchWithProgress('/api/auth/logout', {
+  method: 'POST',
+  credentials: 'include',
+})
+```
+
+O `fetchWithProgress` deve sempre incluir `credentials: 'include'`
+nas chamadas autenticadas. O interceptor HTTP automático pode setar
+isso globalmente se toda a aplicação for autenticada.
+
 ## LoadingButton — componente obrigatório em shared/ui/
 
 > Padrão universal em `CLAUDE.md`. Todo botão que dispara operação assíncrona

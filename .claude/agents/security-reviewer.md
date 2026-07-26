@@ -35,6 +35,10 @@ de autoridade".
 - ID sequencial nunca exposto em rota ou response
 - ABAC: atributos de ambiente do servidor, nunca do cliente
 - Licença de dependência nova: compatível com uso comercial
+- **JWT em `localStorage` ou `sessionStorage` → 🔴 Crítico.**
+  Token deve estar em cookie `HttpOnly; Secure; SameSite=Strict`.
+  Buscar: `localStorage.setItem`, `localStorage.getItem`, `sessionStorage`
+  com qualquer variação de "token", "jwt", "auth" no valor ou chave.
 
 ## Comentários que chegam ao usuário — Crítico
 

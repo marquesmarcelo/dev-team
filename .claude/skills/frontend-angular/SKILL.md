@@ -580,6 +580,43 @@ O spinner substitui o `mat-icon` durante o loading — sem deslocar o
 layout. `HttpClient` dispara a barra superior automaticamente via
 `loadingProgressInterceptor`.
 
+## Autenticação — regra de segurança obrigatória
+
+**JWT nunca vai para `localStorage` ou `sessionStorage`.**
+O token é armazenado em cookie `HttpOnly` pelo backend. O Angular
+não gerencia o token — o browser envia o cookie automaticamente.
+
+```typescript
+// ❌ PROIBIDO — vulnerável a XSS
+localStorage.setItem('auth_token', jwt)
+headers.set('Authorization', `Bearer ${localStorage.getItem('auth_token')}`)
+
+// ✅ CORRETO — withCredentials em toda requisição autenticada
+// O HttpClient envia o cookie HttpOnly automaticamente.
+
+// app.config.ts — setar withCredentials globalmente
+provideHttpClient(
+  withInterceptors([loadingProgressInterceptor]),
+  withCredentials()   // ← todas as requisições incluem cookies
+)
+
+// Ou por interceptor, se só parte das requisições for autenticada:
+export const credentialsInterceptor: HttpInterceptorFn = (req, next) => {
+  return next(req.clone({ withCredentials: true }))
+}
+
+// AuthService — login: backend seta o cookie, Angular não toca no token
+login(email: string, senha: string): Observable<void> {
+  return this.http.post<void>('/api/auth/login', { email, senha })
+  // cookie HttpOnly setado automaticamente pelo browser na resposta
+}
+
+// Logout: backend apaga o cookie
+logout(): Observable<void> {
+  return this.http.post<void>('/api/auth/logout', {})
+}
+```
+
 ## LoadingButton — componente obrigatório em shared/ui/
 
 > Padrão universal em `CLAUDE.md`. Todo botão que dispara operação assíncrona

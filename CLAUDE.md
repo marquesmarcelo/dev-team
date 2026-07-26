@@ -1583,6 +1583,60 @@ frequentemente para evitar atributos obsoletos). O contexto de ambiente
 (horário, IP) é avaliado no momento da requisição. O backend nunca confia
 em atributo de ambiente enviado pelo cliente — usa o da própria requisição.
 
+### Armazenamento do JWT — cookie HttpOnly obrigatório
+
+**Nunca armazenar JWT em `localStorage` ou `sessionStorage`.**
+
+Qualquer JavaScript na página tem acesso a `localStorage` — inclusive
+código malicioso injetado via XSS. Um único ponto vulnerável a XSS
+permite `localStorage.getItem('token')` → sequestro de conta completo
+até o token expirar.
+
+**Solução obrigatória: cookie `HttpOnly` + `Secure` + `SameSite=Strict`.**
+
+```
+Set-Cookie: token=<jwt>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600
+```
+
+| Flag | Efeito |
+|---|---|
+| `HttpOnly` | JavaScript não consegue ler o cookie — imune a XSS |
+| `Secure` | Enviado apenas em HTTPS |
+| `SameSite=Strict` | Não enviado em requisições cross-site — mitiga CSRF |
+| `Path=/` | Enviado em todas as rotas da aplicação |
+| `Max-Age` | TTL do cookie = TTL do JWT |
+
+**Fluxo de autenticação:**
+
+```
+POST /auth/login { email, senha }
+  → backend valida credenciais
+  → backend gera JWT
+  → backend seta cookie HttpOnly na resposta
+  → browser armazena automaticamente (nunca JS)
+
+Requisições subsequentes:
+  → browser envia cookie automaticamente
+  → backend lê JWT do cookie (nunca do header Authorization)
+  → frontend não precisa gerenciar token manualmente
+```
+
+**Logout:**
+
+```
+POST /auth/logout
+  → backend invalida sessão (blacklist ou rotação de secret)
+  → backend apaga o cookie: Set-Cookie: token=; Max-Age=0; HttpOnly; Secure
+```
+
+**Refresh token:**
+
+Usar segundo cookie HttpOnly com TTL maior para renovar o access token
+sem exigir novo login. Nunca expor o refresh token ao JavaScript.
+
+**O `security-reviewer` verifica ativamente:** qualquer uso de
+`localStorage.setItem`/`getItem` com token JWT = achado **Crítico**.
+
 ## Sistema de auditoria (duplo canal — local + syslog)
 
 Toda ação relevante do sistema é registrada em dois canais simultâneos:

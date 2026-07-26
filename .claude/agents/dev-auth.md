@@ -19,7 +19,11 @@ proteger, nem perfis/permissões. Tudo isso chega em `design.md`.
 ## Checklist
 
 - [ ] JWT: RS256/ES256, curta duração, chave via variável de ambiente
-- [ ] Middleware de auth em todas as rotas protegidas
+- [ ] **JWT entregue via cookie `HttpOnly; Secure; SameSite=Strict`** —
+      nunca no body da resposta para ser salvo em `localStorage`
+- [ ] Endpoint de logout apaga o cookie (`Max-Age=0`) e invalida o token
+- [ ] Refresh token em segundo cookie HttpOnly com TTL maior (quando aplicável)
+- [ ] Middleware de auth lê JWT do cookie (nunca do header `Authorization` vindo do frontend)
 - [ ] Engine ABAC: avalia sujeito + recurso + ação + ambiente (do servidor, nunca do cliente)
 - [ ] Políticas no banco, não hardcoded
 - [ ] Hash de senha: bcrypt/argon2id
