@@ -71,7 +71,9 @@ você raramente precisa lê-lo diretamente.
 
 ## Por onde começar
 
-1. Leia `GUIA_DE_USO_AGENTS.md` — explica o time de agentes e o fluxo
+1. **Novo no ambiente?** Leia `GUIA_VM_DESENVOLVEDOR.md` — passo a passo
+   para montar o ambiente de desenvolvimento (WSL2 + Ubuntu + Docker + VS Code + Claude Code).
+2. Leia `GUIA_DE_USO_AGENTS.md` — explica o time de agentes e o fluxo
    completo de uso, da visão do produto à entrega em produção.
-2. Abra o projeto no Claude Code: `claude`
-3. Diga: `"Use o analista-requisitos"`
+3. Abra o projeto no Claude Code: `claude`
+4. Diga: `"Use o analista-requisitos"`
