@@ -780,55 +780,101 @@ export class LoadingButtonComponent {
 </br-button>
 ```
 
-## Editor de texto rico
+## Editor de texto rico (WYSIWYG)
 
 > Usar quando `ux.md` indicar campo com editor rico. Regras universais
 > (quando usar, sanitização, acessibilidade) em `CLAUDE.md` → "Editor
 > de texto rico".
 
-**Lib recomendada:** Quill com `ngx-quill` — bem integrado ao Angular,
-acessível.
+**Lib principal:** TipTap — mais moderno, WAI-ARIA correto, sem jQuery,
+suporta saída em **HTML** ou **Markdown**.
+**Alternativa:** ngx-quill — mais simples de integrar, mas output só HTML.
 
 ```bash
+# TipTap (recomendado)
+npm install @tiptap/core @tiptap/pm @tiptap/starter-kit @tiptap/extension-link
+
+# ngx-quill (alternativa mais simples)
 npm install quill ngx-quill
 ```
 
+### TipTap com Angular (wrapper manual)
+
 ```typescript
-// app.module.ts ou standalone imports
-import { QuillModule } from 'ngx-quill'
+// shared/forms/rich-text-editor/rich-text-editor.component.ts
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy,
+         ElementRef, ViewChild, CUSTOM_ELEMENTS_SCHEMA, forwardRef } from '@angular/core'
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms'
+import { Editor } from '@tiptap/core'
+import StarterKit from '@tiptap/starter-kit'
+import Link from '@tiptap/extension-link'
 
-// Configuração básica (nível "basic" do ux.md)
-const QUILL_BASIC = {
-  toolbar: [
-    ['bold', 'italic', 'underline'],
-    [{ list: 'ordered' }, { list: 'bullet' }],
-    ['link'],
-    ['clean'],
-  ]
-}
-
-// No componente
 @Component({
+  selector: 'app-rich-text-editor',
+  standalone: true,
+  providers: [{
+    provide: NG_VALUE_ACCESSOR,
+    useExisting: forwardRef(() => RichTextEditorComponent),
+    multi: true
+  }],
   template: `
-    <quill-editor
-      [formControl]="conteudoCtrl"
-      [modules]="quillModules"
-      [placeholder]="placeholder"
-      [readOnly]="disabled"
-      aria-label="Conteúdo do campo"
-    />
+    <div class="rich-editor" [class.disabled]="disabled">
+      <div class="toolbar" role="toolbar" aria-label="Formatação de texto">
+        <button type="button" (click)="cmd('toggleBold')"
+                [attr.aria-pressed]="editor?.isActive('bold')"
+                aria-label="Negrito"><strong>B</strong></button>
+        <button type="button" (click)="cmd('toggleItalic')"
+                [attr.aria-pressed]="editor?.isActive('italic')"
+                aria-label="Itálico"><em>I</em></button>
+        <button type="button" (click)="cmd('toggleBulletList')"
+                [attr.aria-pressed]="editor?.isActive('bulletList')"
+                aria-label="Lista">≡</button>
+        <button type="button" (click)="cmd('toggleOrderedList')"
+                [attr.aria-pressed]="editor?.isActive('orderedList')"
+                aria-label="Lista numerada">1.</button>
+      </div>
+      <div #editorEl class="editor-content" role="textbox"
+           aria-multiline="true" [attr.aria-disabled]="disabled"></div>
+    </div>
   `
 })
-export class FormularioComponent {
-  quillModules = QUILL_BASIC
+export class RichTextEditorComponent implements ControlValueAccessor, OnInit, OnDestroy {
+  @Input() outputFormat: 'html' | 'markdown' = 'html'
+  @Input() disabled = false
+  @ViewChild('editorEl', { static: true }) editorEl!: ElementRef
+
+  editor?: Editor
+  private onChange = (_: string) => {}
+  private onTouched = () => {}
+
+  ngOnInit() {
+    this.editor = new Editor({
+      element: this.editorEl.nativeElement,
+      extensions: [StarterKit, Link.configure({ openOnClick: false })],
+      editable: !this.disabled,
+      onUpdate: ({ editor }) => {
+        const value = this.outputFormat === 'html' ? editor.getHTML() : editor.getText()
+        this.onChange(value)
+        this.onTouched()
+      }
+    })
+  }
+
+  cmd(name: string) { (this.editor?.chain().focus() as any)[name]().run() }
+
+  writeValue(value: string)               { this.editor?.commands.setContent(value ?? '') }
+  registerOnChange(fn: any)               { this.onChange = fn }
+  registerOnTouched(fn: any)              { this.onTouched = fn }
+  setDisabledState(isDisabled: boolean)   { this.editor?.setEditable(!isDisabled) }
+  ngOnDestroy()                           { this.editor?.destroy() }
 }
 ```
 
-**TipTap como alternativa** (mais moderno, sem jQuery):
-```bash
-npm install @tiptap/core @tiptap/pm @tiptap/starter-kit
+```html
+<!-- Uso com Reactive Forms -->
+<app-rich-text-editor formControlName="descricao" outputFormat="html">
+</app-rich-text-editor>
 ```
-Requer wrapper Angular manual, mas tem melhor suporte a WAI-ARIA.
 
 **O backend sanitiza o HTML** antes de persistir (ver `CLAUDE.md`).
 

@@ -169,9 +169,14 @@ as implementações reais chegam depois.
 - [ ] Handler segue contrato exato de `design.md`
 - [ ] `/autocomplete` implementado se `ux.md` indicar
 - [ ] Componente implementa `ux.md` (se houver UI)
+- [ ] Se primeira feature com UI + stack Angular+DSGOV: iniciar com
+      `git clone` do quickstart oficial (ver skill `frontend-angular-dsgov`)
+      e ajustar apenas o menu lateral para os itens do projeto
 - [ ] Se primeira feature com UI: AppShell com **indicador de navegação**
       (NProgress) e **sistema de toast** (`notify.sucesso/erro/aviso/info`)
       implementados e registrados globalmente; **LoadingButton** em `shared/ui/`
+- [ ] **Breadcrumb** como primeiro elemento da área de conteúdo em toda
+      página autenticada (ver `CLAUDE.md` "Breadcrumb")
 - [ ] **Todo botão de ação** usa `LoadingButton` com spinner + texto no
       gerúndio — nunca `<Button disabled>` sem feedback visual
 - [ ] Toast usado após toda operação assíncrona (salvar, excluir, erro de API)

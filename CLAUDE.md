@@ -736,6 +736,50 @@ components/
     sidebar-group.tsx     # grupo expansível do menu hierárquico
 ```
 
+### Breadcrumb — obrigatório em toda página autenticada
+
+O breadcrumb é o **primeiro elemento da área de conteúdo** em toda
+página autenticada, logo abaixo do header. Orienta o usuário dentro da
+hierarquia do sistema e é especialmente importante para sistemas com
+muitas seções.
+
+**Profundidade:**
+
+| Tipo de página | Breadcrumb |
+|---|---|
+| Listagem | Início → Nome da seção |
+| Criação | Início → Nome da seção → Novo |
+| Edição | Início → Nome da seção → Nome do registro |
+| Detalhe | Início → Nome da seção → Nome do registro |
+
+**Regras:**
+- O item atual (última posição) nunca é clicável e não tem `href`
+- Sempre começa em "Início" linkando para `/`
+- Implementado com o componente da stack: `<br-breadcrumb>` (DSGOV),
+  `<Breadcrumb>` (shadcn/ui + Next.js) ou equivalente
+
+```html
+<!-- DSGOV -->
+<br-breadcrumb>
+  <crumb label="Início"    href="/"></crumb>
+  <crumb label="Processos" href="/processos"></crumb>
+  <crumb label="Novo processo" current></crumb>
+</br-breadcrumb>
+```
+
+```tsx
+{/* Next.js + shadcn */}
+<Breadcrumb>
+  <BreadcrumbList>
+    <BreadcrumbItem><BreadcrumbLink href="/">Início</BreadcrumbLink></BreadcrumbItem>
+    <BreadcrumbSeparator />
+    <BreadcrumbItem><BreadcrumbLink href="/processos">Processos</BreadcrumbLink></BreadcrumbItem>
+    <BreadcrumbSeparator />
+    <BreadcrumbItem><BreadcrumbPage>Novo processo</BreadcrumbPage></BreadcrumbItem>
+  </BreadcrumbList>
+</Breadcrumb>
+```
+
 ### Exemplo de configuração do menu hierárquico
 
 ```ts

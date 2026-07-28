@@ -234,7 +234,167 @@ func (r *SQLPontoInteresseRepository) BuscarNoRaio(
 
 ---
 
-## Leaflet — mapa no frontend
+---
+
+## Editor de mapas — desenho e edição de geometrias
+
+Quando a feature precisa que o usuário **desenhe** ou **edite** geometrias
+(ponto, linha, polígono), usar `leaflet-geoman` — plugin mais maduro para
+edição de geometrias no Leaflet, output direto em GeoJSON.
+
+```bash
+# Next.js
+npm install @geoman-io/leaflet-geoman-free
+npm install --save-dev @types/leaflet
+
+# Angular
+npm install @geoman-io/leaflet-geoman-free
+```
+
+### Tipos de geometria suportados
+
+| Ferramenta | Tipo GeoJSON | PostGIS |
+|---|---|---|
+| Marcador | `Point` | `GEOMETRY(POINT, 4674)` |
+| Linha | `LineString` | `GEOMETRY(LINESTRING, 4674)` |
+| Polígono | `Polygon` | `GEOMETRY(POLYGON, 4674)` |
+| Retângulo | `Polygon` | `GEOMETRY(POLYGON, 4674)` |
+| Círculo* | `Point` + raio | Salvar centro + raio separados |
+
+> *Círculo não é um tipo GeoJSON nativo — salvar como `Point` com campo
+> `raio_metros` separado, ou converter para polígono aproximado com
+> `ST_Buffer`.
+
+### Implementação Next.js
+
+```tsx
+// components/shared/geo/map-editor.tsx
+'use client'
+import { useEffect, useRef } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
+
+interface MapEditorProps {
+  value?: GeoJSON.Geometry | null     // geometria atual (para edição)
+  onChange: (geom: GeoJSON.Geometry | null) => void
+  geometryType?: 'Point' | 'LineString' | 'Polygon' | 'all'
+  height?: string
+}
+
+export function MapEditor({
+  value, onChange, geometryType = 'all', height = '400px'
+}: MapEditorProps) {
+  const mapRef = useRef<L.Map | null>(null)
+  const divRef = useRef<HTMLDivElement>(null)
+  const layerRef = useRef<L.FeatureGroup>(L.featureGroup())
+
+  useEffect(() => {
+    if (!divRef.current || mapRef.current) return
+
+    const map = L.map(divRef.current).setView([-15.7942, -47.8822], 5)
+    mapRef.current = map
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map)
+
+    layerRef.current.addTo(map)
+
+    // Carregar geometria existente (modo edição)
+    if (value) {
+      const layer = L.geoJSON(value)
+      layer.eachLayer(l => layerRef.current.addLayer(l))
+      map.fitBounds(layerRef.current.getBounds())
+    }
+
+    // Configurar ferramentas de desenho
+    map.pm.addControls({
+      position: 'topleft',
+      drawMarker:   geometryType === 'Point'  || geometryType === 'all',
+      drawPolyline: geometryType === 'LineString' || geometryType === 'all',
+      drawPolygon:  geometryType === 'Polygon' || geometryType === 'all',
+      drawRectangle: geometryType === 'Polygon' || geometryType === 'all',
+      drawCircle:   false,   // ver nota sobre círculo acima
+      editMode:     true,
+      dragMode:     true,
+      cutPolygon:   false,
+      removalMode:  true,
+    })
+
+    // Emitir GeoJSON ao criar/editar/remover
+    const emitChange = () => {
+      const geojson = layerRef.current.toGeoJSON()
+      const features = (geojson as GeoJSON.FeatureCollection).features
+      if (features.length === 0) { onChange(null); return }
+      // Geometria única: retornar a primeira; múltiplas: GeometryCollection
+      onChange(features.length === 1
+        ? features[0].geometry
+        : { type: 'GeometryCollection', geometries: features.map(f => f.geometry) }
+      )
+    }
+
+    map.on('pm:create', ({ layer }) => { layerRef.current.addLayer(layer); emitChange() })
+    map.on('pm:remove', () => emitChange())
+    map.on('pm:edit',   () => emitChange())
+
+    return () => { map.remove(); mapRef.current = null }
+  }, [])
+
+  return (
+    <div ref={divRef} style={{ height }}
+         role="application" aria-label="Editor de mapa" />
+  )
+}
+```
+
+```tsx
+// Uso com react-hook-form
+<Controller name="localizacao" control={control}
+  render={({ field }) =>
+    <MapEditor
+      value={field.value}
+      onChange={field.onChange}
+      geometryType="Point"   // ou "Polygon", "LineString", "all"
+    />
+  }
+/>
+```
+
+### Salvar no backend — GeoJSON → PostGIS
+
+```go
+// Go: converter GeoJSON recebido da API para geometria PostGIS
+// O frontend envia: { "type": "Point", "coordinates": [-47.9, -15.7] }
+_, err := db.ExecContext(ctx, `
+  UPDATE ponto_interesse
+  SET localizacao = ST_SetSRID(ST_GeomFromGeoJSON($1), 4674)
+  WHERE id = $2
+`, geometriaJSON, id)
+```
+
+```python
+# Python: converter usando ST_GeomFromGeoJSON
+cursor.execute("""
+  UPDATE ponto_interesse
+  SET localizacao = ST_SetSRID(ST_GeomFromGeoJSON(%s), 4674)
+  WHERE id = %s
+""", (json.dumps(geom), id))
+```
+
+### Renderizar geometria salva (modo leitura)
+
+```tsx
+// Usar o MapView existente com GeoJSON — sem as ferramentas de edição
+<MapView
+  geojson={{ type: 'Feature', geometry: localizacao, properties: {} }}
+  height="300px"
+/>
+```
+
+---
+
+## Leaflet — mapa no frontend (visualização)
 
 ### Instalação
 
@@ -446,6 +606,8 @@ ogr2ogr -f "PostgreSQL" \
 - [ ] SRID EPSG:4674 (SIRGAS 2000) em todas as colunas de geometria
 - [ ] Índice GIST criado em toda coluna de geometria com busca espacial
 - [ ] API retorna GeoJSON (RFC 7946) — coordenadas em [lon, lat]
+- [ ] Se feature tem editor de mapa: `@geoman-io/leaflet-geoman-free` instalado,
+      output em GeoJSON salvo via `ST_GeomFromGeoJSON` no backend
 - [ ] Leaflet renderizado client-side (Next.js: `'use client'`)
 - [ ] Ícones do Leaflet corrigidos (problema do bundler)
 - [ ] Coordenadas convertidas ao passar GeoJSON → Leaflet ([lon,lat] → [lat,lon])

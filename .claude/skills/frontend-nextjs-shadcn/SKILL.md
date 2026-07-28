@@ -1154,60 +1154,99 @@ export { LoadingButton }
 - O spinner tem `aria-hidden="true"` — o texto já comunica o estado
 - Para ações longas, adicionar `aria-live="polite"` no container pai
 
-## Editor de texto rico
+## Editor de texto rico (WYSIWYG)
 
 > Usar quando `ux.md` indicar campo com editor rico. Regras universais
 > (quando usar, sanitização obrigatória no backend, acessibilidade)
 > em `CLAUDE.md` → "Editor de texto rico".
 
-**Lib recomendada:** TipTap (`@tiptap/react`) — acessível, extensível,
-WAI-ARIA correto por padrão.
+**Lib:** TipTap (`@tiptap/react`) — acessível, extensível, WAI-ARIA correto.
+Suporta saída em **HTML** ou **Markdown** — definir por feature no `spec.md`.
 
 ```bash
-npm install @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-link
+npm install @tiptap/react @tiptap/pm @tiptap/starter-kit \
+            @tiptap/extension-link @tiptap/extension-image \
+            @tiptap/extension-markdown   # saída Markdown (opcional)
 ```
 
 ```tsx
-// components/shared/rich-text-editor.tsx
+// components/shared/forms/rich-text-editor.tsx
+'use client'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 
-export function RichTextEditor({ value, onChange, placeholder, disabled }: {
-  value: string;  onChange: (v: string) => void
-  placeholder?: string;  disabled?: boolean
-}) {
+interface RichTextEditorProps {
+  value: string
+  onChange: (html: string) => void
+  outputFormat?: 'html' | 'markdown'   // padrão: html
+  placeholder?: string
+  disabled?: boolean
+}
+
+export function RichTextEditor({
+  value, onChange, outputFormat = 'html', placeholder, disabled
+}: RichTextEditorProps) {
   const editor = useEditor({
-    extensions: [StarterKit, Link.configure({ openOnClick: false })],
+    extensions: [
+      StarterKit,
+      Link.configure({ openOnClick: false }),
+    ],
     content: value,
     editable: !disabled,
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor }) => {
+      const out = outputFormat === 'markdown'
+        ? editor.storage.markdown?.getMarkdown?.() ?? editor.getText()
+        : editor.getHTML()
+      onChange(out)
+    },
   })
 
   return (
-    <div className="border rounded-md">
-      <div className="flex gap-1 border-b p-1" role="toolbar" aria-label="Formatação de texto">
-        <button type="button" aria-label="Negrito" aria-pressed={editor?.isActive('bold')}
+    <div className={`border rounded-md ${disabled ? 'opacity-60' : ''}`}>
+      <div className="flex gap-1 border-b p-1 flex-wrap"
+           role="toolbar" aria-label="Formatação de texto">
+        <button type="button" aria-label="Negrito"
+                aria-pressed={editor?.isActive('bold')}
                 onClick={() => editor?.chain().focus().toggleBold().run()}>
           <strong>B</strong>
         </button>
-        {/* itálico, lista, link conforme nível definido em ux.md */}
+        <button type="button" aria-label="Itálico"
+                aria-pressed={editor?.isActive('italic')}
+                onClick={() => editor?.chain().focus().toggleItalic().run()}>
+          <em>I</em>
+        </button>
+        <button type="button" aria-label="Lista"
+                aria-pressed={editor?.isActive('bulletList')}
+                onClick={() => editor?.chain().focus().toggleBulletList().run()}>
+          ≡
+        </button>
+        <button type="button" aria-label="Lista numerada"
+                aria-pressed={editor?.isActive('orderedList')}
+                onClick={() => editor?.chain().focus().toggleOrderedList().run()}>
+          1.
+        </button>
       </div>
-      {/* TipTap já injeta role="textbox" aria-multiline="true" na área de edição */}
-      <EditorContent editor={editor} className="p-3 min-h-[120px] prose prose-sm max-w-none" />
+      <EditorContent
+        editor={editor}
+        className="p-3 min-h-[120px] prose prose-sm max-w-none"
+        placeholder={placeholder}
+      />
     </div>
   )
 }
 ```
 
-Integrar com react-hook-form via `Controller`:
+**Integrar com react-hook-form:**
 ```tsx
 <Controller name="descricao" control={control}
-  render={({ field }) => <RichTextEditor value={field.value} onChange={field.onChange} />} />
+  render={({ field }) =>
+    <RichTextEditor value={field.value} onChange={field.onChange} outputFormat="html" />
+  }
+/>
 ```
 
-**O backend sanitiza o HTML** antes de persistir (ver `CLAUDE.md`).
-O frontend nunca renderiza HTML salvo sem passar por `DOMPurify` ou
+**O backend sanitiza antes de persistir** — ver `CLAUDE.md` "Editor de texto rico".
 sanitização equivalente no lado do cliente também.
 
 ## Relação com o UX Designer
