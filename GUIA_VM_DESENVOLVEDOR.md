@@ -335,64 +335,30 @@ code --install-extension humao.rest-client
 
 ---
 
-## Passo 9 — Ferramentas adicionais por stack
+## Por que não instalar Go, Python, Java, PHP ou Node localmente?
 
-Instale apenas as ferramentas da stack que você vai usar:
+Todo o código da aplicação roda **dentro de containers Docker** — backend,
+frontend, banco de dados, testes. Você não precisa das linguagens instaladas
+na máquina host.
 
-### Go
-
-```bash
-# Instalar Go
-wget https://go.dev/dl/go1.23.0.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-echo 'export GOPATH=$HOME/go' >> ~/.bashrc
-echo 'export PATH=$PATH:$GOPATH/bin' >> ~/.bashrc
-source ~/.bashrc
-go version
-
-# Ferramentas Go usadas nos projetos
-go install github.com/air-verse/air@latest          # hot-reload
-go install github.com/swaggo/swag/cmd/swag@latest   # OpenAPI
-go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+```
+Desenvolvedor (WSL2 + VS Code)
+        ↓  docker compose up
+Container backend (Go / Python / Java / PHP / Node)
+Container postgres
+Container frontend (Next.js / Angular)
 ```
 
-### Python
+O `docker compose -f docker-compose.dev.yml up` já cuida de tudo:
+compilação, hot-reload, migrations e seed. Qualquer comando de teste
+ou migração é executado dentro do container via `docker compose run`.
 
-```bash
-sudo apt install -y python3 python3-pip python3-venv python3-dev
-pip3 install --upgrade pip
-```
-
-### Java
-
-```bash
-sudo apt install -y openjdk-21-jdk maven
-java -version
-mvn -version
-```
-
-### PHP
-
-```bash
-sudo apt install -y php8.3-cli php8.3-mbstring php8.3-xml php8.3-curl
-curl -sS https://getcomposer.org/installer | php
-sudo mv composer.phar /usr/local/bin/composer
-php -version
-composer --version
-```
-
-### Node.js / NestJS
-
-```bash
-# Já instalado via NVM no Passo 6
-npm install -g @nestjs/cli typescript ts-node
-nest --version
-```
+A única exceção é o **Node.js**, instalado no Passo 6 — necessário para
+rodar o Claude Code na máquina host, não para desenvolver a aplicação.
 
 ---
 
-## Passo 10 — Verificação final
+## Passo 9 — Verificação final
 
 Execute o checklist abaixo para confirmar que tudo está funcionando:
 
