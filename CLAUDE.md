@@ -28,7 +28,32 @@
 
 Teste: "Um engenheiro sênior diria que isso é overcomplicated?" Se sim, simplifique.
 
-## 2. Mudanças cirúrgicas
+## 2. Simplicidade primeiro — escada de decisão (baseado no ponytail)
+
+Antes de escrever qualquer código, percorrer esta escada de cima para baixo
+e parar no primeiro degrau que se aplica:
+
+```
+1. Este item precisa existir?          → não: não fazer nada (YAGNI)
+2. Já existe neste codebase?           → sim: reutilizar, não reescrever
+3. A stdlib/runtime resolve?           → sim: usar
+4. Feature nativa da plataforma?       → sim: usar (ex: <input type="date">)
+5. Dependência já instalada resolve?   → sim: usar
+6. Cabe em uma linha?                  → sim: uma linha
+7. Só então: o mínimo que funciona
+```
+
+A escada roda **depois** de entender o problema — não em vez disso.
+Ler o código que a mudança toca e rastrear o fluxo real antes de escolher
+o degrau. Preguiçoso com a solução, nunca com a leitura.
+
+**Nunca comprometer:** validação de fronteira de confiança, tratamento de
+perda de dados, segurança e acessibilidade não estão na escada — são
+obrigatórios independente do degrau escolhido.
+
+O código fica pequeno porque é necessário, não porque foi golfado.
+
+## 3. Mudanças cirúrgicas
 
 **Toque apenas o que você deve. Limpe apenas a sua própria bagunça.**
 
@@ -44,7 +69,7 @@ Ao criar orfãos com suas mudanças:
 
 Teste: cada linha alterada deve ter rastreamento direto para a solicitação do usuário.
 
-## 3. Execução orientada a objetivos (Goal-Driven)
+## 4. Execução orientada a objetivos (Goal-Driven)
 
 **Defina critérios de sucesso. Itere até verificar.**
 
@@ -83,7 +108,7 @@ independente com mínima interação. Critérios fracos ("faça funcionar")
 exigem clarificação constante.
 
 ---
-## 4. Comentários no código-fonte
+## 5. Comentários no código-fonte
 
 **Comentários existem para o programador, não para registrar histórico.**
 
@@ -112,7 +137,7 @@ map.setView([lat, lon], zoom)
 - **Nunca** deixar decisões de design, mudanças de requisito ou contexto
   de negócio apenas no código-fonte — isso vai no `spec.md`
 
-## 5. spec.md é a fonte de verdade das decisões
+## 6. spec.md é a fonte de verdade das decisões
 
 **Qualquer mudança de requisito, decisão de design ou ajuste durante a
 implementação deve ser refletida no `specs/<feature>/spec.md`.**
@@ -143,7 +168,7 @@ TEXT com CHECK CONSTRAINT ('aberto','em_andamento','encerrado')
 Motivo: permite extensão por migração sem alterar código da aplicação
 ```
 
-## 6. Documentação visual obrigatória no spec.md
+## 7. Documentação visual obrigatória no spec.md
 
 **Todo spec.md de feature com tela deve ter representação visual.**
 

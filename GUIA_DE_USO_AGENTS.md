@@ -478,6 +478,26 @@ npx skills add JuliusBrussee/caveman
 # Ativar na sessão: /caveman  |  Desativar: "stop caveman"
 ```
 
+**Graphify** — transforma uma pasta de código, schemas SQL, docs e PDFs em um knowledge graph consultável. Útil para o `auditor-projeto` entender projetos legados, ou para o `arquiteto` mapear um sistema existente antes de propor mudanças. *Não faz parte do fluxo padrão de desenvolvimento.*
+```bash
+# Instalação
+uv tool install graphifyy   # ou: pipx install graphifyy
+
+# Registrar no Claude Code (uma vez)
+graphify install
+
+# Uso dentro do Claude Code
+/graphify .                            # mapear o projeto atual
+/graphify query "o que conecta auth ao banco?"
+graphify export callflow-html          # diagrama de arquitetura em HTML com Mermaid
+```
+O graphify gera três arquivos em `graphify-out/`:
+- `graph.html` — visualização interativa (abrir no browser)
+- `GRAPH_REPORT.md` — nós centrais, conexões surpresa, perguntas sugeridas
+- `graph.json` — grafo completo queryável
+
+Repositório: https://github.com/safishamsi/graphify
+
 ---
 
 ## Como atualizar para uma nova versão do template
@@ -808,6 +828,8 @@ Para cada um: o que foi analisado, o que foi incorporado e o que não foi.
 | [obra/superpowers](https://github.com/obra/superpowers) | Framework de skills com TDD, debugging sistemático e padrões de colaboração. | **Incorporado:** `systematic-debugging` como skill do projeto — processo de 4 fases (reprodução → causa raiz → hipótese → implementação) referenciado pelo `dev-fullstack` |
 | [laravel/agent-skills](https://github.com/laravel/agent-skills) | Coleção oficial de skills Laravel: `laravel-simplifier`, `starter-kit-upgrade`, `laravel-cloud`, `laravel-nightwatch`. | **Não incorporado** — as skills oficiais cobrem o ecossistema Laravel Cloud (hospedagem paga) e não tratam de desenvolvimento de API REST, hexagonal ou CQRS. Nossa `backend-php-laravel/SKILL.md` é mais adequada para o contexto |
 | [angular/skills](https://github.com/angular/skills) | Skills oficiais do Angular: `angular-developer` (Signals, linkedSignal, resource, DI, ARIA) e `angular-new-app`. | **Parcialmente incorporado:** `resource()` e `linkedSignal()` do Angular 19+ adicionados à skill `frontend-angular` como alternativas modernas ao padrão Observable/switchMap |
+| [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | Skill viral (91k★) que faz o agente "pensar como o dev sênior mais preguiçoso da sala" — escada de 7 degraus YAGNI antes de qualquer linha de código. | **Incorporado:** escada de decisão adicionada ao Princípio 2 do `CLAUDE.md` — sem instalação do plugin externo, o conceito é suficiente |
+| [safishamsi/graphify](https://github.com/safishamsi/graphify) | Transforma pasta de código, schemas SQL, docs e PDFs em knowledge graph consultável. Gera `graph.html`, `GRAPH_REPORT.md` e `graph.json`. | **Não incorporado** como skill padrão — registrado no GUIA como ferramenta opcional para análise de codebase e auditoria de projetos legados |
 | [affaan-m/everything-claude-code — nestjs-patterns](https://github.com/affaan-m/everything-claude-code/blob/main/skills/nestjs-patterns/SKILL.md) | Skill NestJS de produção: módulos, controllers, DTOs, guards, interceptors, config validada, testing. | **Parcialmente incorporado:** estrutura geral e padrões de testing usados como referência para `backend-nestjs/SKILL.md`, adaptada para arquitetura hexagonal e padrões deste projeto |
 | [MuhammadUsmanGM/claude-code-best-practices](https://github.com/MuhammadUsmanGM/claude-code-best-practices) | Guia abrangente de melhores práticas para Claude Code: CLAUDE.md, hooks, skills, permissões, custo. | **Não incorporado** — referência para evolução futura dos agentes |
 | [GetBindu/awesome-claude-code-and-skills](https://github.com/GetBindu/awesome-claude-code-and-skills) | Coleção curada de skills — inclui `claudemd-auditor` para auditoria de CLAUDE.md com score 0-100. | **Não incorporado** — referência útil para futura skill de auto-auditoria |
