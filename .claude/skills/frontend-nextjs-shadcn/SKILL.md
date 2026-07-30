@@ -1261,6 +1261,31 @@ export function RichTextEditor({
 **O backend sanitiza antes de persistir** — ver `CLAUDE.md` "Editor de texto rico".
 sanitização equivalente no lado do cliente também.
 
+## Anti-padrões de design — detectar antes de entregar
+
+shadcn/ui é o template mais afetado pelos vícios de "AI slop". Antes de
+considerar qualquer tela entregue, verificar que não há:
+
+```
+❌ Inter como única fonte (vício de AI slop)
+❌ Gradiente roxo-para-azul decorativo
+❌ Texto cinza (#999, #aaa) sobre fundo colorido
+❌ Cards aninhados dentro de outros cards
+❌ Ícone em rounded-square acima de todo heading
+❌ Preto puro — usar tint da cor primária
+❌ Bounce/elastic easing em animações
+❌ Padding menor que 16px em áreas de conteúdo
+```
+
+**Detector automático** (sem API key, roda no CI):
+```bash
+npx impeccable detect src/       # varredura do diretório
+npx impeccable detect --json src/ # saída JSON para CI
+```
+
+60 regras determinísticas — instalar via `npx impeccable install` para
+integração com Claude Code. Repositório: https://github.com/pbakaus/impeccable
+
 ## Relação com o UX Designer
 - Testes de integração de componente (ex: Testing Library) > testes
   unitários isolados de componente puro.

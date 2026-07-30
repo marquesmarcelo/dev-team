@@ -84,3 +84,33 @@ típicos e as regras obrigatórias de segurança (XSS) e acessibilidade.
 ```
 
 **PARE** após salvar. Informe onde o arquivo foi criado e aguarde aprovação.
+
+## Anti-padrões de design gerado por IA (evitar sempre)
+
+Agentes de IA treinados nos mesmos templates produzem os mesmos vícios visuais.
+Baseado no detector do impeccable (pbakaus/impeccable, 52k★):
+
+**Tipografia:**
+- ❌ Inter como única fonte — escolher tipografia com personalidade para o produto
+- ❌ Hierarquia de tamanhos inconsistente — definir escala tipográfica e seguir
+- ❌ Texto cinza sobre fundo colorido — contraste insuficiente e visual confuso
+
+**Cor:**
+- ❌ Gradiente roxo-para-azul como padrão decorativo — vício de AI slop
+- ❌ Preto puro (#000) ou cinza puro (#999) — sempre adicionar leve matiz da cor primária
+- ❌ Cor aplicada sem intenção — cada uso de cor deve ter propósito
+
+**Layout:**
+- ❌ Cards aninhados dentro de cards — criar profundidade visual desnecessária
+- ❌ Ícone em quadrado arredondado acima de todo heading — padrão esgotado
+- ❌ Padding apertado — elementos precisam de espaço para respirar
+- ❌ Tudo centrado — alinhar à esquerda como regra, centralizar como exceção intencional
+
+**Movimento:**
+- ❌ Bounce/elastic easing — parece datado; usar ease-out para entradas, ease-in para saídas
+- ❌ Animação sem propósito — movimento deve comunicar estado ou guiar atenção
+
+**Geral:**
+- ❌ Template de SaaS genérico — o design deve refletir o produto e seu público
+- ✅ Para projetos Next.js/shadcn: `npx impeccable detect src/` detecta 60 anti-padrões sem API key
+
