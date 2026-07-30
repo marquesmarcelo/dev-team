@@ -10,6 +10,18 @@ description: Use ao implementar frontend em Next.js com shadcn/ui, quando projec
 > de nomear arquivos, componentes ou hooks. Exemplo de árvore de pastas
 > completa em `examples/folder-structures/frontend-nextjs-shadcn.md`.
 
+## ⚠️ Verificar versão antes de implementar
+
+```bash
+npm show next version           # versão atual do Next.js
+npm show @shadcn/ui version     # versão atual do shadcn
+cat package.json | grep next    # versão instalada no projeto
+```
+
+Consultar https://ui.shadcn.com/docs para componentes atualizados.
+Se a versão instalada diferir da atual, verificar breaking changes
+(especialmente App Router vs Pages Router e mudanças de API).
+
 ## Estrutura de pastas
 ```
 src/

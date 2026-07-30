@@ -21,6 +21,18 @@ A pesquisa atual indica:
 - A decisão vai registrada em `project.config.md` — não inventar durante a
   implementação.
 
+## ⚠️ Verificar versão antes de implementar
+
+```bash
+npm show @angular/core version   # versão atual do Angular
+cat package.json | grep angular  # versão instalada no projeto
+```
+
+Consultar https://angular.dev para APIs atuais (signals, resource(),
+linkedSignal()). Angular 17+ usa standalone por padrão e tem mudanças
+frequentes no sistema de reatividade — verificar se resource() e
+linkedSignal() estão disponíveis na versão instalada.
+
 ## Estrutura de pastas
 
 ```

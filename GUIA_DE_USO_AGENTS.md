@@ -457,6 +457,17 @@ em `CLAUDE.md`).
 | `systematic-debugging` | Qualquer stack | Debug em 4 fases: reprodução → causa raiz → hipótese → correção. Baseado no Superpowers (Jesse Vincent) |
 | `geo` | PostGIS + Leaflet + GeoServer | Dados geográficos: tipos PostGIS, SIRGAS 2000 (EPSG:4674), API GeoJSON, Leaflet, GeoServer WMS/WFS opcional, fontes IBGE/CONCAR. Ativado via `Geo: sim` em `project.config.md` |
 
+### Documentação de referência (`.claude/references/`)
+
+Arquivos de documentação técnica para uso direto pelos agentes, com fallback
+quando o repositório oficial estiver indisponível:
+
+| Arquivo | Conteúdo | Atualizar |
+|---|---|---|
+| `dsgov-llms-full.txt` | Documentação completa DSGOV WBC otimizada para IA | `curl -o .claude/references/dsgov-llms-full.txt https://webcomponents-ds.estaleiro.serpro.gov.br/llms-full.txt` |
+
+Ver `.claude/references/README.md` para política de atualização.
+
 ---
 
 ### Skills externas opcionais (instalação separada)

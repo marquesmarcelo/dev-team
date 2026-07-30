@@ -10,6 +10,17 @@ description: Use ao implementar backend em Go com Gin, quando project.config.md 
 > tipos, funções ou arquivos. Exemplo de árvore de pastas completa em
 > `examples/folder-structures/backend-go-hexagonal.md`.
 
+## ⚠️ Verificar versão antes de implementar
+
+```bash
+go version                          # versão do Go instalada
+cat go.mod | grep "^go "           # versão exigida pelo projeto
+go list -m -u all 2>/dev/null | grep govbr  # atualizações disponíveis
+```
+
+Consultar https://pkg.go.dev para versão atual das dependências principais.
+Se houver diferença significativa, verificar breaking changes no CHANGELOG.
+
 ## Estrutura de pastas
 ```
 /internal
