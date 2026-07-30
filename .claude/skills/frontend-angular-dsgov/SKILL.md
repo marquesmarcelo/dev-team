@@ -1,13 +1,14 @@
 ---
 name: frontend-angular-dsgov
-description: Use quando o project.config.md indicar sistema público ou conformidade com o Padrão Digital de Governo (DSGOV). O frontend Angular+DSGOV SEMPRE começa com git clone do quickstart oficial — nunca com ng new. Leia junto com frontend-angular/SKILL.md.
+description: Use quando o project.config.md indicar sistema público ou conformidade com o Padrão Digital de Governo (DSGOV). O frontend Angular+DSGOV SEMPRE começa com git clone do quickstart oficial. Para standalone Angular, importar componentes individualmente de @govbr-ds/webcomponents-angular/standalone — nunca usar CUSTOM_ELEMENTS_SCHEMA nem defineCustomElements(). Leia junto com frontend-angular/SKILL.md.
 ---
 
 # Frontend Angular + DSGOV Web Components (Standalone)
 
 > Leia junto com `frontend-angular/SKILL.md`.
 >
-> Documentação:
+> **Referências obrigatórias — ler antes de qualquer implementação:**
+> - Guia de implementação: https://gitlab.com/govbr-ds/bibliotecas/wbc/govbr-ds-wbc-quickstart-angular/-/blob/main/GUIA-IMPLEMENTACAO.md
 > - Componentes: https://govbr-ds.gitlab.io/bibliotecas/wbc/govbr-ds-wbc/docs/components/
 > - Design System: https://www.gov.br/ds/home
 
@@ -16,18 +17,15 @@ description: Use quando o project.config.md indicar sistema público ou conformi
 ## Ponto de partida obrigatório — clone do quickstart oficial
 
 **Nunca usar `ng new` para projetos Angular+DSGOV.**
-O projeto começa sempre pelo clone do quickstart oficial, que já tem
-toda a configuração correta: `angular.json`, `main.ts`, `styles.scss`,
-pacotes instalados e estrutura validada pelo time do SERPRO.
 
 ```bash
-git clone https://gitlab.com/govbr-ds/bibliotecas/wbc/govbr-ds-wbc-quickstart-angular.git nome-do-projeto
+git clone git@gitlab.com:govbr-ds/bibliotecas/wbc/govbr-ds-wbc-quickstart-angular.git nome-do-projeto
 cd nome-do-projeto
 npm install
-npm start   # http://localhost:4200 — validar que tudo funciona antes de qualquer mudança
+npm start   # validar que funciona antes de qualquer mudança
 ```
 
-Com o projeto rodando, fazer o reset do histórico Git e conectar ao repositório do projeto:
+Com o projeto rodando, conectar ao repositório do projeto:
 
 ```bash
 rm -rf .git
@@ -40,253 +38,358 @@ git push -u origin main
 
 ### O que ajustar no quickstart
 
-O quickstart já entrega tudo pronto — estrutura, configuração, componentes.
-O único ajuste é limpar os **itens de exemplo** do menu e substituir pelos
-itens reais do projeto. O componente `<br-menu>` e toda a estrutura ao redor
-permanecem intocados.
+Apenas os `<menu-item>` de exemplo — manter o componente `<br-menu>` e toda a
+estrutura ao redor exatamente como veio. Substituir somente os itens pelos
+itens reais do projeto:
 
 ```html
-<!-- Manter exatamente o <br-menu> do quickstart.
-     Apenas substituir os <menu-item> de exemplo pelos itens do projeto,
-     definidos no nav-config criado a partir de specs/00-visao-produto.md -->
-
 <br-menu id="menu-lateral">
   <menu-header slot="header">Nome do Sistema</menu-header>
-
-  <!-- Apagar os itens de exemplo do quickstart e colocar os do projeto -->
+  <!-- Apagar os itens de exemplo e colocar os do projeto -->
   <menu-item slot="items" label="Início"    icon="home"   href="/"></menu-item>
   <menu-item slot="items" label="Processos" icon="folder" href="/processos"></menu-item>
   <menu-item slot="items" label="Usuários"  icon="users"  href="/usuarios"></menu-item>
 </br-menu>
 ```
 
-Nada mais do quickstart deve ser alterado. Funcionalidades entram como
-novas rotas e componentes — nunca modificando a estrutura base.
+---
+
+## Arquitetura correta para standalone Angular
+
+<cite index="16-1">Para standalone Angular, importar componentes individualmente do subpath `/standalone` — o wrapper Angular cuida do registro dos custom elements internamente, sem necessidade de `CUSTOM_ELEMENTS_SCHEMA` nem `defineCustomElements()`.</cite>
+
+```typescript
+// ❌ ERRADO — abordagem anterior, causa problemas
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core'
+import { defineCustomElements } from '@govbr-ds/webcomponents/loader'
+defineCustomElements()  // não necessário com o wrapper Angular
+
+// ✅ CORRETO — importar do subpath /standalone
+import { BrButton, BrInput, BrSelect, BrModal }
+  from '@govbr-ds/webcomponents-angular/standalone'
+
+@Component({
+  standalone: true,
+  imports: [BrButton, BrInput, ReactiveFormsModule],
+  // schemas: [] — NÃO precisa de CUSTOM_ELEMENTS_SCHEMA
+  template: `<br-button emphasis="primary">Salvar</br-button>`
+})
+export class ProcessoFormComponent {}
+```
+
+### Reactive Forms com Web Components
+
+<cite index="18-1">Para habilitar `ngModel` e two-way binding, adicionar `FormsModule` e o atributo `ngDefaultControl` no componente de formulário.</cite>
+
+**⚠️ Atenção — Value Accessors explícitos obrigatórios para `br-select`, `br-radio` e `br-checkbox`:**
+
+`br-input` e `br-textarea` funcionam com `ngDefaultControl` genérico. Mas
+`br-select`, `br-radio` e `br-checkbox` têm API interna própria — sem importar
+o Value Accessor correto, o `formControlName` usa um fallback genérico do Angular
+que não entende essa API, causando binding inconsistente (valor não atualiza,
+validação não dispara corretamente).
+
+```typescript
+// Importar o componente E seu Value Accessor específico
+import {
+  BrInput,                              // ngDefaultControl genérico OK
+  BrTextarea,                           // ngDefaultControl genérico OK
+  BrSelect,   SelectValueAccessor,      // ← Value Accessor obrigatório
+  BrRadio,    RadioValueAccessor,       // ← Value Accessor obrigatório
+  BrCheckbox, BooleanValueAccessor,     // ← Value Accessor obrigatório
+  BrButton,
+  BrMessage,
+} from '@govbr-ds/webcomponents-angular/standalone'
+
+@Component({
+  standalone: true,
+  imports: [
+    ReactiveFormsModule,
+    FormsModule,
+    BrInput,
+    BrSelect,   SelectValueAccessor,    // sempre juntos
+    BrRadio,    RadioValueAccessor,     // sempre juntos
+    BrCheckbox, BooleanValueAccessor,   // sempre juntos
+    BrButton,
+    BrMessage,
+  ],
+  template: `
+    <form [formGroup]="form">
+      <!-- Input: ngDefaultControl genérico é suficiente -->
+      <br-input label="Nome" formControlName="nome"
+        ngDefaultControl [state]="fieldState('nome')">
+      </br-input>
+
+      <!-- Select: OBRIGATÓRIO ter SelectValueAccessor no imports -->
+      <br-select label="Status" formControlName="status"
+        ngDefaultControl [state]="fieldState('status')">
+        <select-option value="aberto">Aberto</select-option>
+        <select-option value="encerrado">Encerrado</select-option>
+      </br-select>
+
+      <!-- Radio: OBRIGATÓRIO ter RadioValueAccessor no imports -->
+      <br-radio label="Masculino" value="M" formControlName="genero"
+        ngDefaultControl>
+      </br-radio>
+      <br-radio label="Feminino"  value="F" formControlName="genero"
+        ngDefaultControl>
+      </br-radio>
+
+      <!-- Checkbox: OBRIGATÓRIO ter BooleanValueAccessor no imports -->
+      <br-checkbox label="Ativo" formControlName="ativo"
+        ngDefaultControl>
+      </br-checkbox>
+    </form>
+  `
+})
+export class FormularioComponent {
+  form = inject(FormBuilder).group({
+    nome:   ['', Validators.required],
+    status: ['', Validators.required],
+    genero: [''],
+    ativo:  [false],
+  })
+
+  fieldState(field: string): 'info' | 'danger' {
+    const c = this.form.get(field)
+    return c?.invalid && c?.touched ? 'danger' : 'info'
+  }
+  showError(field: string): boolean {
+    const c = this.form.get(field)
+    return !!(c?.invalid && c?.touched)
+  }
+}
+```
+
+**Regra prática:**
+
+| Componente | Import necessário | Value Accessor |
+|---|---|---|
+| `BrInput` | `BrInput` | `ngDefaultControl` genérico |
+| `BrTextarea` | `BrTextarea` | `ngDefaultControl` genérico |
+| `BrSelect` | `BrSelect, SelectValueAccessor` | **obrigatório** |
+| `BrRadio` | `BrRadio, RadioValueAccessor` | **obrigatório** |
+| `BrCheckbox` | `BrCheckbox, BooleanValueAccessor` | **obrigatório** |
+| `BrSwitch` | `BrSwitch, BooleanValueAccessor` | **obrigatório** |
+
+### `tsconfig.json` — skipLibCheck obrigatório
+
+```json
+{
+  "compilerOptions": {
+    "skipLibCheck": true
+  }
+}
+```
+
+---
+
+## Configuração do quickstart (referência — não alterar)
+
+O quickstart já entrega tudo correto. Registrado aqui apenas para referência:
+
+### `angular.json` — CSS via `styles`
+
+```json
+"styles": [
+  "node_modules/@govbr-ds/core/dist/core-tokens.min.css",
+  "src/styles.scss"
+]
+```
+
+> `core-tokens.min.css` — não `core.min.css`. Diferença causa ausência total de estilos.
+
+### `src/styles.scss` — apenas estilos customizados
+
+```scss
+// O CSS do DSGOV já está no angular.json
+// Adicionar aqui apenas sobrescritas específicas do projeto
+```
 
 ---
 
 ## Padrão obrigatório — Breadcrumb na área útil
 
-Toda página autenticada deve ter `<br-breadcrumb>` como **primeiro elemento
-da área de conteúdo** (logo abaixo do header, antes de qualquer outro conteúdo).
+Toda página autenticada tem `<br-breadcrumb>` como **primeiro elemento** da área de conteúdo:
 
-```html
-<!-- layout da página padrão -->
-<main id="main-content">
+```typescript
+import { BrBreadcrumb } from '@govbr-ds/webcomponents-angular/standalone'
 
-  <!-- Breadcrumb: SEMPRE a primeira linha da área útil -->
-  <br-breadcrumb>
-    <crumb label="Início" href="/"></crumb>
-    <crumb [label]="secaoAtual" [href]="secaoPath"></crumb>
-    <crumb [label]="paginaAtual" current></crumb>
-  </br-breadcrumb>
+@Component({
+  standalone: true,
+  imports: [BrBreadcrumb],
+  template: `
+    <main id="main-content">
+      <br-breadcrumb>
+        <crumb label="Início"    href="/"></crumb>
+        <crumb label="Processos" href="/processos"></crumb>
+        <crumb label="Novo processo" current></crumb>
+      </br-breadcrumb>
 
-  <!-- Título e conteúdo da página -->
-  <h1>{{ tituloDaPagina }}</h1>
-  <!-- ... -->
-
-</main>
+      <h1>Novo Processo</h1>
+      <!-- conteúdo da página -->
+    </main>
+  `
+})
 ```
-
-**Regra de profundidade do breadcrumb:**
 
 | Tipo de página | Breadcrumb |
 |---|---|
-| Listagem | Início → Nome da seção |
-| Formulário de criação | Início → Nome da seção → Novo |
-| Formulário de edição | Início → Nome da seção → Nome do registro |
-| Detalhe | Início → Nome da seção → Nome do registro |
-
-O `current` (sem `href`) é sempre o último item — indica a página atual
-e não é clicável. Nunca omitir o breadcrumb em páginas autenticadas.
+| Listagem | Início → Seção |
+| Criação | Início → Seção → Novo |
+| Edição | Início → Seção → Nome do registro |
 
 ---
 
-## Catálogo de componentes (40 disponíveis)
+## Catálogo de imports `/standalone`
 
-<cite index="92-1">40 componentes disponíveis, todos com API estável e recomendada para novos projetos.</cite>
-Consulte exemplos em: https://govbr-ds.gitlab.io/bibliotecas/wbc/govbr-ds-wbc/docs/components/
-
-### Layout e navegação
-
-**Header**
-```html
-<br-header>
-  <header-logo slot="logo" src="/assets/logo-gov.svg" alt="Governo Federal"></header-logo>
-  <header-link slot="links" label="Início" href="/"></header-link>
-  <header-function slot="functions" icon="user" label="Perfil"></header-function>
-</br-header>
-```
-
-**Menu (sidebar)**
-```html
-<br-menu id="menu-lateral">
-  <menu-header slot="header">Nome do Sistema</menu-header>
-  <menu-item slot="items" label="Início"    icon="home"   href="/"></menu-item>
-  <menu-item slot="items" label="Processos" icon="folder" href="/processos"></menu-item>
-  <menu-item slot="items" label="Usuários"  icon="users"  href="/usuarios"></menu-item>
-</br-menu>
-```
-
-**Breadcrumb**
-```html
-<br-breadcrumb>
-  <crumb label="Início"    href="/"></crumb>
-  <crumb label="Processos" href="/processos"></crumb>
-  <crumb label="Novo"      current></crumb>
-</br-breadcrumb>
-```
-
-**Footer**
-```html
-<br-footer>
-  <footer-logo slot="logo" src="/assets/logo-gov.svg"></footer-logo>
-  <footer-legal slot="legal">© 2026 Nome do Órgão</footer-legal>
-</br-footer>
-```
-
-**Tab**
-```html
-<br-tab>
-  <tab-item label="Dados"     active></tab-item>
-  <tab-item label="Histórico"></tab-item>
-  <tab-item label="Anexos"></tab-item>
-</br-tab>
-```
-
----
-
-### Formulários
-
-**Helper de estado de validação** — adicionar ao componente
+Importar apenas os componentes usados em cada componente Angular:
 
 ```typescript
-fieldState(field: string): 'info' | 'danger' {
-  const c = this.form.get(field)
-  return c?.invalid && c?.touched ? 'danger' : 'info'
-}
+import {
+  // Layout e navegação
+  BrHeader, BrMenu, BrBreadcrumb, BrFooter, BrTab,
 
-showError(field: string): boolean {
-  const c = this.form.get(field)
-  return !!(c?.invalid && c?.touched)
-}
-```
+  // Formulários
+  BrInput, BrTextarea, BrSelect, BrCheckbox, BrCheckgroup,
+  BrRadio, BrSwitch, BrDatePicker, BrDatetimeInput,
+  BrUpload, BrSlider,
 
-**Input**
-```html
-<br-input
-  label="Nome completo"
-  formControlName="nome"
-  [state]="fieldState('nome')">
-</br-input>
-<br-message *ngIf="showError('nome')" state="danger" [show-icon]="true">
-  Nome é obrigatório.
-</br-message>
-```
+  // Botões e ações
+  BrButton, BrDropdown,
 
-**Textarea**
-```html
-<br-textarea label="Descrição" formControlName="descricao" rows="4"
-  [state]="fieldState('descricao')">
-</br-textarea>
-```
+  // Feedback
+  BrMessage, BrNotification, BrModal, BrLoading, BrTag, BrTooltip,
 
-**Select**
-```html
-<br-select label="Status" formControlName="status" [state]="fieldState('status')">
-  <select-option value="">Selecione...</select-option>
-  <select-option value="aberto">Aberto</select-option>
-  <select-option value="encerrado">Encerrado</select-option>
-</br-select>
-```
+  // Dados e listagem
+  BrTable, BrPagination, BrCard, BrList,
 
-**Checkbox / Checkgroup**
-```html
-<br-checkbox label="Aceito os termos" formControlName="aceite"></br-checkbox>
+  // Progresso
+  BrStep, BrWizard, BrCollapse,
 
-<br-checkgroup label="Permissões">
-  <br-checkbox label="Leitura" value="read"  name="perms"></br-checkbox>
-  <br-checkbox label="Escrita" value="write" name="perms"></br-checkbox>
-</br-checkgroup>
-```
+  // Outros
+  BrAvatar, BrIcon, BrDivider, BrScrim,
+  BrSkipLinkItem, BrCookiebar, BrSignIn,
 
-**Radio**
-```html
-<br-radio label="Masculino" value="M" formControlName="genero"></br-radio>
-<br-radio label="Feminino"  value="F" formControlName="genero"></br-radio>
-```
-
-**Switch**
-```html
-<br-switch label="Ativo" formControlName="ativo"></br-switch>
-```
-
-**DateTimePicker**
-```html
-<br-date-picker     label="Data de nascimento" formControlName="dataNasc"></br-date-picker>
-<br-datetime-input  label="Data e hora"        formControlName="dataHora"></br-datetime-input>
-```
-
-**Upload**
-```html
-<br-upload label="Anexar documento" accept=".pdf,.doc" (brChange)="onFile($event)">
-</br-upload>
-```
-
-**Slider**
-```html
-<br-slider label="Quantidade" min="0" max="100" formControlName="qtd"></br-slider>
+} from '@govbr-ds/webcomponents-angular/standalone'
 ```
 
 ---
 
-### Botões e ações
+## Exemplos de componentes mais usados
 
-**Button**
-```html
-<br-button emphasis="primary"   (brClick)="salvar()">Salvar</br-button>
-<br-button emphasis="secondary" (brClick)="cancelar()">Cancelar</br-button>
-<br-button emphasis="tertiary"  danger (brClick)="excluir()">Excluir</br-button>
+### Button
 
-<!-- Com loading nativo — substitui LoadingButton do Angular padrão -->
-<br-button emphasis="primary" [loading]="salvando()" (brClick)="salvar()">
-  Salvar
-</br-button>
-
-<!-- Ícone circular para botões de linha no grid -->
-<br-button emphasis="tertiary" circle icon="pencil"
-  [loading]="editingId() === item.id" (brClick)="editar(item.id)">
-</br-button>
-<br-button emphasis="tertiary" circle icon="trash" danger
-  [loading]="deletingId() === item.id" (brClick)="excluir(item.id)">
-</br-button>
-```
-
-**Dropdown**
-```html
-<br-dropdown label="Ações">
-  <br-item label="Editar"   icon="pencil"   (brClick)="editar(item)"></br-item>
-  <br-item label="Exportar" icon="download" (brClick)="exportar(item)"></br-item>
-  <br-divider></br-divider>
-  <br-item label="Excluir"  icon="trash" danger (brClick)="excluir(item)"></br-item>
-</br-dropdown>
-```
-
----
-
-### Feedback
-
-**Message** (inline — dentro do contexto da página)
-```html
-<br-message state="danger"  [show-icon]="true">Campo obrigatório.</br-message>
-<br-message state="warning" [show-icon]="true">Dado pode estar desatualizado.</br-message>
-<br-message state="success" [show-icon]="true">Salvo com sucesso.</br-message>
-<br-message state="info"    [show-icon]="true">Preencha todos os campos.</br-message>
-```
-
-**Notification** (toast — declarar no AppComponent raiz)
 ```typescript
-// core/services/notify.service.ts
+import { BrButton } from '@govbr-ds/webcomponents-angular/standalone'
+
+@Component({
+  standalone: true,
+  imports: [BrButton],
+  template: `
+    <br-button emphasis="primary"   (brClick)="salvar()">Salvar</br-button>
+    <br-button emphasis="secondary" (brClick)="cancelar()">Cancelar</br-button>
+    <br-button emphasis="tertiary"  danger (brClick)="excluir()">Excluir</br-button>
+    <br-button emphasis="primary"   [loading]="salvando()" (brClick)="salvar()">Salvar</br-button>
+
+    <!-- Botões de linha no grid — loading por ID -->
+    <br-button emphasis="tertiary" circle icon="pencil"
+      [loading]="editingId() === item.id" (brClick)="editar(item.id)">
+    </br-button>
+    <br-button emphasis="tertiary" circle icon="trash" danger
+      [loading]="deletingId() === item.id" (brClick)="excluir(item.id)">
+    </br-button>
+  `
+})
+```
+
+### Formulário completo
+
+```typescript
+import { BrInput, BrSelect, BrButton, BrMessage }
+  from '@govbr-ds/webcomponents-angular/standalone'
+
+@Component({
+  standalone: true,
+  imports: [ReactiveFormsModule, FormsModule, BrInput, BrSelect, BrButton, BrMessage],
+  template: `
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+      <br-input label="Nome" formControlName="nome"
+        ngDefaultControl [state]="fieldState('nome')">
+      </br-input>
+      <br-message *ngIf="showError('nome')" state="danger" [show-icon]="true">
+        Nome obrigatório.
+      </br-message>
+
+      <br-select label="Status" formControlName="status"
+        ngDefaultControl [state]="fieldState('status')">
+        <select-option value="aberto">Aberto</select-option>
+        <select-option value="encerrado">Encerrado</select-option>
+      </br-select>
+
+      <br-button type="submit" emphasis="primary" [loading]="salvando()" (brClick)="onSubmit()">
+        Salvar
+      </br-button>
+    </form>
+  `
+})
+export class ProcessoFormComponent {
+  salvando = signal(false)
+  form = inject(FormBuilder).group({
+    nome:   ['', Validators.required],
+    status: ['', Validators.required],
+  })
+
+  fieldState(field: string): 'info' | 'danger' {
+    const c = this.form.get(field)
+    return c?.invalid && c?.touched ? 'danger' : 'info'
+  }
+  showError(field: string): boolean {
+    const c = this.form.get(field)
+    return !!(c?.invalid && c?.touched)
+  }
+  async onSubmit() {
+    if (this.form.invalid) { this.form.markAllAsTouched(); return }
+    this.salvando.set(true)
+    try {
+      await this.service.criar(this.form.value)
+      this.notify.sucesso('Criado', 'Registro salvo com sucesso.')
+    } catch {
+      this.notify.erro('Erro', 'Tente novamente.')
+    } finally { this.salvando.set(false) }
+  }
+}
+```
+
+### Modal
+
+```typescript
+import { BrModal, BrButton } from '@govbr-ds/webcomponents-angular/standalone'
+
+// ⚠️ Declarar no componente da PÁGINA — nunca dentro do menu ou header
+@Component({
+  standalone: true,
+  imports: [BrModal, BrButton],
+  template: `
+    <br-modal title="Confirmar exclusão"
+      [visible]="modalAberto" (brClose)="modalAberto = false">
+      <span slot="content">Deseja excluir este registro? Ação irreversível.</span>
+      <span slot="footer">
+        <br-button emphasis="secondary" (brClick)="modalAberto = false">Cancelar</br-button>
+        <br-button emphasis="primary" danger
+          [loading]="excluindo" (brClick)="confirmar()">Excluir</br-button>
+      </span>
+    </br-modal>
+  `
+})
+```
+
+### Notification (toast — declarar no AppComponent raiz)
+
+```typescript
+import { BrNotification } from '@govbr-ds/webcomponents-angular/standalone'
+
+// notify.service.ts
 @Injectable({ providedIn: 'root' })
 export class NotifyService {
   visivel  = signal(false)
@@ -300,7 +403,6 @@ export class NotifyService {
     this.mensagem.set(m); this.duracao.set(ms)
     this.visivel.set(true)
   }
-
   fechar()  { this.visivel.set(false) }
   sucesso(t: string, m: string) { this.show('success', t, m, 4000) }
   erro(t: string, m: string)    { this.show('danger',  t, m, 8000) }
@@ -311,194 +413,108 @@ export class NotifyService {
 
 ```html
 <!-- app.component.html -->
-<br-notification
-  [show]="notif.visivel()"
-  [state]="notif.tipo()"
-  [timer]="notif.duracao()"
-  (brClose)="notif.fechar()">
+<br-notification [show]="notif.visivel()" [state]="notif.tipo()"
+  [timer]="notif.duracao()" (brClose)="notif.fechar()">
   <notification-header slot="header">{{ notif.titulo() }}</notification-header>
   <notification-body   slot="body">{{ notif.mensagem() }}</notification-body>
 </br-notification>
 ```
 
-**Modal** (declarar na página, nunca dentro de br-menu ou br-header)
-```html
-<!-- ⚠️ Declarar no componente da página, não aninhado no menu -->
-<br-modal title="Confirmar exclusão" [visible]="modalAberto" (brClose)="modalAberto = false">
-  <span slot="content">
-    Deseja excluir "{{ itemSelecionado?.nome }}"? Ação irreversível.
-  </span>
-  <span slot="footer">
-    <br-button emphasis="secondary" (brClick)="modalAberto = false">Cancelar</br-button>
-    <br-button emphasis="primary" danger [loading]="excluindo" (brClick)="confirmar()">
-      Excluir
-    </br-button>
-  </span>
-</br-modal>
-```
+### Table com loading por linha
 
-**Loading**
-```html
-<br-loading *ngIf="carregando" label="Carregando..."></br-loading>
-```
+```typescript
+import { BrTable, BrButton, BrTag } from '@govbr-ds/webcomponents-angular/standalone'
 
-**Tag**
-```html
-<br-tag label="Aberto"       color="success"></br-tag>
-<br-tag label="Em andamento" color="warning"></br-tag>
-<br-tag label="Encerrado"    color="danger"></br-tag>
-```
+@Component({
+  standalone: true,
+  imports: [CommonModule, BrTable, BrButton, BrTag],
+  template: `
+    <br-table density="medium">
+      <table-header>
+        <table-header-cell>Descrição</table-header-cell>
+        <table-header-cell>Status</table-header-cell>
+        <table-header-cell>Ações</table-header-cell>
+      </table-header>
+      <table-body>
+        <table-row *ngFor="let p of processos()">
+          <table-cell>{{ p.descricao }}</table-cell>
+          <table-cell>
+            <br-tag [label]="p.status" [color]="statusColor(p.status)"></br-tag>
+          </table-cell>
+          <table-cell>
+            <br-button emphasis="tertiary" circle icon="pencil"
+              [loading]="editingId() === p.id" (brClick)="editar(p.id)">
+            </br-button>
+            <br-button emphasis="tertiary" circle icon="trash" danger
+              [loading]="deletingId() === p.id" (brClick)="excluir(p.id)">
+            </br-button>
+          </table-cell>
+        </table-row>
+      </table-body>
+    </br-table>
 
-**Tooltip**
-```html
-<br-tooltip text="Clique para editar" place="top">
-  <br-button emphasis="tertiary" circle icon="pencil"></br-button>
-</br-tooltip>
-```
-
----
-
-### Dados e listagem
-
-**Table**
-```html
-<br-table density="medium">
-  <table-header>
-    <table-header-cell>Descrição</table-header-cell>
-    <table-header-cell>Status</table-header-cell>
-    <table-header-cell>Data</table-header-cell>
-    <table-header-cell>Ações</table-header-cell>
-  </table-header>
-  <table-body>
-    <table-row *ngFor="let p of processos()">
-      <table-cell>{{ p.descricao }}</table-cell>
-      <table-cell>
-        <br-tag [label]="p.status" [color]="statusColor(p.status)"></br-tag>
-      </table-cell>
-      <table-cell>{{ p.criadoEm | date:'dd/MM/yyyy' }}</table-cell>
-      <table-cell>
-        <br-button emphasis="tertiary" circle icon="pencil"
-          [loading]="editingId() === p.id" (brClick)="editar(p.id)">
-        </br-button>
-        <br-button emphasis="tertiary" circle icon="trash" danger
-          [loading]="deletingId() === p.id" (brClick)="excluir(p.id)">
-        </br-button>
-      </table-cell>
-    </table-row>
-  </table-body>
-</br-table>
-```
-
-**Pagination**
-```html
-<br-pagination
-  [total]="total()"
-  [page]="pagina()"
-  [page-count]="itensPorPagina"
-  (brPage)="mudarPagina($event.detail)">
-</br-pagination>
-```
-
-**Card**
-```html
-<br-card>
-  <span slot="header">Título do Card</span>
-  <span slot="content">Conteúdo do card.</span>
-  <span slot="footer">
-    <br-button emphasis="primary">Ver detalhes</br-button>
-  </span>
-</br-card>
-```
-
-**List**
-```html
-<br-list>
-  <br-item *ngFor="let i of itens" [label]="i.nome" [description]="i.desc"></br-item>
-</br-list>
+    <br-pagination [total]="total()" [page]="pagina()"
+      [page-count]="20" (brPage)="mudarPagina($event.detail)">
+    </br-pagination>
+  `
+})
 ```
 
 ---
 
-### Navegação e progresso
+## Skip Link e CookieBar — obrigatórios no AppComponent
 
-**Step**
-```html
-<br-step>
-  <step-item label="Identificação" status="success" step="1"></step-item>
-  <step-item label="Dados"         status="active"  step="2"></step-item>
-  <step-item label="Confirmação"   status="pending" step="3"></step-item>
-</br-step>
-```
+```typescript
+import { BrSkipLinkItem, BrCookiebar, BrNotification }
+  from '@govbr-ds/webcomponents-angular/standalone'
 
-**Wizard**
-```html
-<br-wizard>
-  <wizard-panel label="Identificação" active><!-- etapa 1 --></wizard-panel>
-  <wizard-panel label="Dados"><!-- etapa 2 --></wizard-panel>
-</br-wizard>
-```
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [RouterOutlet, BrSkipLinkItem, BrCookiebar, BrNotification, ...],
+  template: `
+    <!-- Primeiro elemento do AppComponent — acessibilidade eMAG -->
+    <br-skip-link-item label="Ir para o conteúdo" href="#main-content">
+    </br-skip-link-item>
 
-**Collapse**
-```html
-<br-collapse label="Ver detalhes">
-  <span slot="content">Conteúdo expandível.</span>
-</br-collapse>
-```
+    <!-- Header e menu do quickstart -->
+    <br-header>...</br-header>
+    <br-menu>...</br-menu>
 
----
+    <main id="main-content">
+      <router-outlet></router-outlet>
+    </main>
 
-### Outros
+    <!-- Notificações globais -->
+    <br-notification ...></br-notification>
 
-**Avatar**
-```html
-<br-avatar name="João Silva" size="medium"></br-avatar>
-```
-
-**Icon**
-```html
-<br-icon name="home" size="medium"></br-icon>
-```
-
-**Divider**
-```html
-<br-divider></br-divider>
-```
-
-**Scrim** (overlay de foco)
-```html
-<br-scrim [active]="modalAberto" (brClick)="fecharModal()"></br-scrim>
-```
-
-**Skip Link** (acessibilidade eMAG — obrigatório)
-```html
-<!-- Primeiro elemento do AppComponent -->
-<br-skip-link-item label="Ir para o conteúdo" href="#main-content"></br-skip-link-item>
-```
-
-**CookieBar** (LGPD — quando aplicável)
-```html
-<br-cookiebar>
-  <cookiebar-header slot="header">Política de Cookies</cookiebar-header>
-  <cookiebar-note slot="notes">Usamos cookies para melhorar sua experiência.</cookiebar-note>
-</br-cookiebar>
-```
-
-**Sign-in** (autenticação gov.br)
-```html
-<br-sign-in label="Entrar com gov.br" (brClick)="loginGovBr()"></br-sign-in>
+    <!-- CookieBar — quando necessário (LGPD) -->
+    <br-cookiebar>
+      <cookiebar-header slot="header">Cookies</cookiebar-header>
+      <cookiebar-note slot="notes">Usamos cookies para melhorar sua experiência.</cookiebar-note>
+    </br-cookiebar>
+  `
+})
+export class AppComponent {}
 ```
 
 ---
 
-## Checklist — verificar antes de qualquer componente
+## Checklist
 
-- [ ] `core-tokens.min.css` no array `styles` do `angular.json` (não `core.min.css`, não `@import` no SCSS)
-- [ ] `defineCustomElements()` chamado em `main.ts` ANTES de `bootstrapApplication()`
-- [ ] `CUSTOM_ELEMENTS_SCHEMA` em todo componente standalone com tags `<br-*>`
-- [ ] `WebcomponentsAngularModule.forRoot()` **NÃO** usado
-- [ ] `<br-modal>` declarado no componente da página, **nunca** dentro de `<br-menu>`
-- [ ] `<br-notification>` declarado no `AppComponent` raiz
-- [ ] Botões com loading usando `[loading]="sinal()"` nativo do `<br-button>`
-- [ ] Estado de validação via `[state]="fieldState('campo')"` nos inputs
+- [ ] Projeto iniciado com `git clone` do quickstart oficial
+- [ ] `npm start` funcionando antes de qualquer alteração
+- [ ] Apenas os `<menu-item>` substituídos — estrutura do quickstart intacta
+- [ ] Componentes importados de `@govbr-ds/webcomponents-angular/standalone`
+- [ ] `ngDefaultControl` em todo input dentro de Reactive Forms
+- [ ] `SelectValueAccessor`, `RadioValueAccessor`, `BooleanValueAccessor` importados
+      **junto** com `BrSelect`, `BrRadio`, `BrCheckbox`, `BrSwitch` em todo componente
+      com formulário — sem eles o binding é inconsistente
+- [ ] `skipLibCheck: true` no `tsconfig.json`
+- [ ] **NÃO** usar `CUSTOM_ELEMENTS_SCHEMA`
+- [ ] **NÃO** usar `defineCustomElements()`
+- [ ] **NÃO** usar `WebcomponentsAngularModule.forRoot()`
+- [ ] `<br-modal>` declarado no componente da página (nunca dentro do menu)
+- [ ] `<br-notification>` no `AppComponent` raiz
 - [ ] `<br-skip-link-item>` como primeiro elemento do `AppComponent`
-- [ ] Sem classes CSS `br-*` aplicadas manualmente
+- [ ] `<br-breadcrumb>` como primeiro elemento da área de conteúdo em toda página autenticada
