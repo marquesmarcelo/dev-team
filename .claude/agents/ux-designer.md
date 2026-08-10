@@ -85,6 +85,49 @@ típicos e as regras obrigatórias de segurança (XSS) e acessibilidade.
 
 **PARE** após salvar. Informe onde o arquivo foi criado e aguarde aprovação.
 
+## Princípios de motion design
+
+Baseado no design-motion-principles (kylezantos/design-motion-principles, 893★).
+Distilado do trabalho publicado de Emil Kowalski, Jakub Krehel e Jhey Tompkins.
+
+**Primeira pergunta sobre qualquer animação:** "Isso deveria animar?"
+Se não comunica estado, não guia atenção ou não dá feedback de ação — não anima.
+
+**Lens pelo contexto do projeto:**
+
+| Contexto | Lens | Significa |
+|---|---|---|
+| Sistema público / produtividade (DSGOV) | Emil Kowalski — Contenção | Duração 100-200ms, ease-out, sem bounce. Dúvida → não anima |
+| App consumer / profissional | Jakub Krehel — Polimento | Sutil, nunca chama atenção para si mesmo |
+| App lúdico / portfólio | Jhey Tompkins — Criatividade | Personalidade com propósito |
+
+**Anti-padrões de motion gerado por IA:**
+```
+❌ Pulsing indicators em tudo
+❌ hover scale em todos os elementos clicáveis
+❌ Stagger-spam — listas com delay encadeado sem motivo
+❌ Blur-everywhere no mount
+❌ Bounce/spring em ações utilitárias (salvar, excluir, navegar)
+❌ Fade-in uniforme em todo conteúdo estático
+❌ scale(0) como ponto de partida sem contexto
+❌ ease linear sem intenção
+```
+
+**Regras obrigatórias:**
+- `prefers-reduced-motion` sempre — desabilitar animações decorativas quando ativo
+- Duração máxima em apps de produtividade: 300ms
+- Easing: ease-out para entradas, ease-in para saídas, ease-in-out para transições
+- Nunca animar `width`/`height` — usar `transform: scale` ou `max-height`
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
 ## Anti-padrões de design gerado por IA (evitar sempre)
 
 Agentes de IA treinados nos mesmos templates produzem os mesmos vícios visuais.

@@ -604,6 +604,47 @@ rm -rf .claude.bak CLAUDE.md.bak
 > no mesmo projeto. Se você é o único desenvolvedor, pode simplificar
 > ainda mais.
 
+### Issues — toda tarefa começa aqui
+
+**Nenhum branch é criado sem uma Issue correspondente.**
+A Issue é o contrato entre o que vai ser feito e por quê.
+
+**Três tipos de Issue:**
+
+| Tipo | Label | Quando criar |
+|---|---|---|
+| 🐛 **Correção** | `bug` | Comportamento incorreto encontrado em qualquer ambiente |
+| ✨ **Melhoria** | `enhancement` | Aprimoramento de funcionalidade existente |
+| 🚀 **Nova função** | `feature` | Funcionalidade nova não prevista anteriormente |
+
+**Estrutura de uma Issue bem escrita:**
+
+```markdown
+## Contexto
+Breve descrição do problema ou necessidade. Por que isso importa?
+
+## Comportamento atual (para bugs)
+O que acontece hoje.
+
+## Comportamento esperado
+O que deveria acontecer.
+
+## Critérios de aceitação
+- [ ] Quando faço X, o sistema faz Y
+- [ ] O campo Z é obrigatório
+- [ ] A listagem exibe até 20 itens por página
+
+## Referências
+- spec: `specs/nome-da-feature/spec.md` (se existir)
+- Branch: `feature/nome-da-feature` (preencher ao iniciar)
+```
+
+**Agentes e Issues:** quando o `analista-requisitos` cria um `spec.md`,
+o time deve criar a Issue correspondente antes de o `arquiteto` ser acionado.
+A Issue vincula o trabalho dos agentes ao fluxo de gestão do time.
+
+---
+
 ### Por que não o GitFlow clássico
 
 O GitFlow tradicional (com branches `develop`, `release`, `hotfix`) foi
@@ -653,32 +694,48 @@ release/v1.0
 ### Fluxo do dia a dia
 
 ```
-1. Antes de começar: sincronize com main
+1. Crie (ou localize) a Issue antes de começar
+   → Issues > New Issue > escolher tipo (bug / enhancement / feature)
+   → Anotar o número da Issue: ex. #42
+
+2. Antes de começar: sincronize com main e crie o branch vinculado
    git checkout main
    git pull origin main
-   git checkout -b feature/nome-da-feature
+   git checkout -b feature/42-cadastro-usuario
+   #                    ↑  sempre prefixar com o número da Issue
 
-2. Desenvolva em commits pequenos e frequentes
-   git add .
-   git commit -m "feat: adicionar filtro por status na listagem de processos"
+3. Desenvolva em commits pequenos e frequentes
+   git commit -m "feat(usuarios): adicionar formulário de cadastro"
+   git commit -m "feat(usuarios): adicionar validação de CPF"
    # Commitar pelo menos uma vez por dia — nunca deixar branch local
    # sem push por mais de 1 dia
 
-3. Abra Pull Request para staging (não para main)
-   git push origin feature/nome-da-feature
-   # Abrir PR: feature/nome-da-feature → staging
+4. Abra Pull Request para staging referenciando a Issue
+   git push origin feature/42-cadastro-usuario
+   # Título do PR:  feat: cadastro de usuário (#42)
+   # Descrição do PR (obrigatório):
+   #   ## O que foi feito
+   #   Implementação do cadastro de usuário conforme spec.md
+   #
+   #   ## Issue relacionada
+   #   Closes #42        ← fecha a Issue automaticamente ao merge
+   #
+   #   ## Como testar
+   #   1. Acessar /usuarios/novo
+   #   2. Preencher nome, CPF e e-mail
+   #   3. Clicar em Salvar — deve redirecionar para a listagem
 
-4. CI roda automaticamente no PR
-   lint → test → sonarqube → build
+5. CI roda automaticamente no PR
+   lint → quality (biome, knip, arch-contract) → test → sonarqube → build
    # PR só pode ser mergeado com CI verde + aprovação
 
-5. Após aprovação e CI verde: merge em staging
+6. Após aprovação e CI verde: merge em staging
    # Deploy automático em staging
    # qa-tester valida no ambiente de staging
 
-6. Após validação em staging: PR de staging → main
+7. Após validação em staging: PR de staging → main
    # Deploy automático em produção
-   # Deletar a feature branch após merge
+   # Deletar a feature branch após merge — Issue fechada automaticamente
 ```
 
 ---
@@ -738,10 +795,12 @@ git merge main
 
 ### Regras de Pull Request
 
+- **Issue obrigatória:** todo PR referencia uma Issue com `Closes #N` — sem Issue, sem PR
+- **Título segue Conventional Commits:** `feat: cadastro de usuário (#42)`
 - **Mínimo 1 aprovação** de outro desenvolvedor antes do merge
-- **CI obrigatoriamente verde** (lint + test + SonarQube Quality Gate)
+- **CI obrigatoriamente verde** (lint + biome + knip + arch-contract + test + SonarQube)
 - **Branch atualizada com main** antes do merge (rebase ou merge de main na branch)
-- **Descrição do PR referencia o spec:** "Implementa `specs/listagem-processos/`"
+- **Descrição obrigatória:** o que foi feito, Issue relacionada (`Closes #N`), como testar
 - **Feature branch deletada** imediatamente após o merge
 - **Nunca fazer force push** em `main` ou `staging`
 
@@ -828,6 +887,7 @@ Para cada um: o que foi analisado, o que foi incorporado e o que não foi.
 | [obra/superpowers](https://github.com/obra/superpowers) | Framework de skills com TDD, debugging sistemático e padrões de colaboração. | **Incorporado:** `systematic-debugging` como skill do projeto — processo de 4 fases (reprodução → causa raiz → hipótese → implementação) referenciado pelo `dev-fullstack` |
 | [laravel/agent-skills](https://github.com/laravel/agent-skills) | Coleção oficial de skills Laravel: `laravel-simplifier`, `starter-kit-upgrade`, `laravel-cloud`, `laravel-nightwatch`. | **Não incorporado** — as skills oficiais cobrem o ecossistema Laravel Cloud (hospedagem paga) e não tratam de desenvolvimento de API REST, hexagonal ou CQRS. Nossa `backend-php-laravel/SKILL.md` é mais adequada para o contexto |
 | [angular/skills](https://github.com/angular/skills) | Skills oficiais do Angular: `angular-developer` (Signals, linkedSignal, resource, DI, ARIA) e `angular-new-app`. | **Parcialmente incorporado:** `resource()` e `linkedSignal()` do Angular 19+ adicionados à skill `frontend-angular` como alternativas modernas ao padrão Observable/switchMap |
+| [kylezantos/design-motion-principles](https://github.com/kylezantos/design-motion-principles) | Skill de motion design com dois modos — build (criar componentes animados) e audit (revisar animações). Três lenses pesadas por contexto: Emil Kowalski (contenção), Jakub Krehel (polimento), Jhey Tompkins (criatividade). Anti-AI-slop de motion: stagger-spam, hover-scale-on-everything, blur-everywhere, bounce em ações utilitárias. | **Parcialmente incorporado:** princípios de motion e anti-padrões adicionados ao `ux-designer.md` e à skill `accessibility`. Para auditar animações existentes: `npx skills add kylezantos/design-motion-principles` |
 | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | Design language de 52k★ — 23 comandos de design (`/impeccable audit`, `polish`, `critique`, `distill`...), 60 regras determinísticas de anti-padrões de AI slop, iteração ao vivo no browser. Partiu da skill `frontend-design` da Anthropic. | **Parcialmente incorporado:** os principais anti-padrões adicionados ao `ux-designer.md` e à skill `frontend-nextjs-shadcn`. Para projetos Next.js, instalar com `npx impeccable install` para o detector automático no Claude Code. Não aplicável para Angular+DSGOV (design system impõe a linguagem visual) |
 | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | Skill viral (91k★) que faz o agente "pensar como o dev sênior mais preguiçoso da sala" — escada de 7 degraus YAGNI antes de qualquer linha de código. | **Incorporado:** escada de decisão adicionada ao Princípio 2 do `CLAUDE.md` — sem instalação do plugin externo, o conceito é suficiente |
 | [safishamsi/graphify](https://github.com/safishamsi/graphify) | Transforma pasta de código, schemas SQL, docs e PDFs em knowledge graph consultável. Gera `graph.html`, `GRAPH_REPORT.md` e `graph.json`. | **Não incorporado** como skill padrão — registrado no GUIA como ferramenta opcional para análise de codebase e auditoria de projetos legados |

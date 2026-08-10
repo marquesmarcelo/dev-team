@@ -138,3 +138,33 @@ O **eMAG** (Modelo de Acessibilidade em Governo Eletrônico) é a referência of
 - Compatibilidade explícita com leitores de tela em português (NVDA com eSpeak PT-BR, Orca no Linux).
 
 Para aplicações governamentais voltadas ao público externo, a conformidade com eMAG é obrigatória, não opcional.
+
+
+---
+
+## Motion e animações — `prefers-reduced-motion` obrigatório
+
+Todo projeto com animações CSS ou JavaScript deve respeitar a preferência
+do usuário por movimento reduzido. Usuários com epilepsia, vertigem ou
+sensibilidade a movimento podem ser prejudicados por animações.
+
+```css
+/* Adicionar em globals.css ou styles.scss — obrigatório */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration:        0.01ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:       0.01ms !important;
+    scroll-behavior:           auto   !important;
+  }
+}
+```
+
+**Regra de design de motion** (princípio de Emil Kowalski):
+A primeira pergunta sobre qualquer animação é "isso deveria animar?".
+Só animar quando há propósito — comunicar estado, guiar atenção ou
+dar feedback de ação. Para sistemas de produtividade (DSGOV, dashboards),
+duração máxima 300ms e sem bounce/spring em ações utilitárias.
+
+Ver `ux-designer.md` para a lista completa de anti-padrões de motion
+gerado por IA (stagger-spam, hover-scale-on-everything, etc.).

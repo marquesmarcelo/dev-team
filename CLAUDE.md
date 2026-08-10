@@ -837,6 +837,69 @@ do framework ou biblioteca de componentes usados. O `ux-designer` as aplica
 ao projetar as telas; o `dev-frontend` as implementa; o `code-reviewer` as
 verifica. Nenhuma skill de tecnologia específica pode contradizer estas regras.
 
+### Skeleton, lazy loading e animações (obrigatório em toda interface)
+
+Toda interface comunica estado visualmente em todo momento. Nenhum elemento
+aparece, desaparece ou muda instantaneamente sem transição — quando isso
+fizer sentido para a experiência.
+
+**Skeleton loading — a forma aparece antes do conteúdo:**
+- Toda área com conteúdo assíncrono mostra skeleton enquanto carrega
+- O skeleton tem a mesma estrutura do conteúdo real (mesma proporção de colunas, mesma altura de linha)
+- Nunca spinner centralizado isolado — sempre skeleton que reflete o layout real
+- Animação de pulso suave (`opacity` 1→0.4→1, ~1.5s, ease-in-out)
+- Onde obrigatório: linhas de grid/tabela, cards, cabeçalho de detalhe, formulário de edição enquanto dados carregam, imagens
+
+**Lazy loading:**
+- Imagens: `loading="lazy"` + placeholder da mesma proporção (evitar CLS)
+- Rotas: code splitting — cada página carrega só seu bundle
+- Componentes pesados (editor rico, mapa, gráficos): import dinâmico, só quando a feature for usada
+- Listas: paginação preferida; virtualização para listas > 100 itens
+
+**Animações de entrada, saída e transição:**
+
+| Elemento | Entrada | Saída |
+|---|---|---|
+| Modal | fade + scale 0.95→1 | scale 1→0.95 + fade |
+| Toast/Notification | slide da borda + fade | fade + slide reverso |
+| Drawer/Sidebar | slide lateral | slide reverso |
+| Dropdown/Menu | fade + scale vertical (origin no trigger) | fade |
+| Accordion/Collapse | height 0→auto | height auto→0 |
+| Lista de itens | stagger sutil (máx 50ms entre itens, só na primeira carga) | — |
+| Skeleton → conteúdo | cross-fade | — |
+| Página (route change) | fade sutil | fade |
+
+**Onde NÃO animar:**
+- Hover em botões utilitários (salvar, excluir) — sem scale
+- Campos de formulário em foco — apenas border-color
+- Mensagens de erro de validação — aparecem imediatamente (urgência)
+- Qualquer elemento que aparece > 5x por minuto
+
+**Parâmetros padrão (definir uma vez em globals):**
+```css
+:root {
+  --duration-fast:   100ms;   /* hover, feedback imediato */
+  --duration-normal: 200ms;   /* entrada/saída de elementos */
+  --duration-slow:   300ms;   /* modais, transições de página */
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --ease-exit:  cubic-bezier(0.4, 0, 1, 1);
+  --ease-state: cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+.skeleton { animation: skeleton-pulse 1.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+A implementação concreta (Framer Motion / Next.js, @angular/animations) vem da skill da stack.
+
 ### Grid/listagem: comportamento obrigatório
 
 **1. Estrutura da tela de listagem**
@@ -1969,7 +2032,97 @@ SonarQube como **fase obrigatória do pipeline** (não opcional, não manual).
 Quality Gate mínimo: cobertura ≥ 80%, nenhum bug/vulnerabilidade nova de
 severidade Critical ou Blocker. O `dev-docker-compose` configura e mantém este pipeline.
 
-## Hierarquia de autoridade e resolução de conflito
+### Ferramentas de qualidade para projetos JS/TS
+
+Todo projeto com frontend JS/TS (Next.js, Angular) ou backend Node.js (NestJS)
+deve incluir as ferramentas abaixo. O `dev-fullstack` as configura na primeira
+entrega e o `code-reviewer` verifica sua presença.
+
+**Biome** — linter + formatter unificado (substitui ESLint + Prettier, 50-100x mais rápido):
+```bash
+npm install --save-dev @biomejs/biome
+npx @biomejs/biome init
+```
+Verificar em CI: `npx biome ci .` — falha se houver problemas de lint ou formatação.
+
+**commitlint + husky** — valida que commits seguem Conventional Commits:
+```bash
+npm install --save-dev @commitlint/cli @commitlint/config-conventional husky
+npx husky init
+echo "npx --no -- commitlint --edit \$1" > .husky/commit-msg
+echo "export default { extends: ['@commitlint/config-conventional'] }" > commitlint.config.js
+```
+Formato obrigatório: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `ci:`.
+Breaking change: `feat!:` ou `BREAKING CHANGE:` no corpo do commit.
+
+**knip** — detecta exports, arquivos e dependências não usados:
+```bash
+npm install --save-dev knip
+npx knip
+```
+Evita código morto acumulando silenciosamente. Rodar no CI antes do build.
+
+**dependency-cruiser** — valida contratos arquiteturais (hexagonal):
+```bash
+npm install --save-dev dependency-cruiser
+npx depcruise --init
+```
+Verifica que as regras de hexagonal são respeitadas em código:
+- `domain/` nunca importa de `adapter/`
+- `adapter/` de um tipo nunca importa de `adapter/` de outro tipo
+- `shared/` nunca importa de `features/`
+
+Gera diagrama visual da arquitetura: `npx depcruise --output-type dot src | dot -T svg > architecture.svg`
+
+**Stryker** (mutation testing — opcional, para cobertura de alta qualidade):
+```bash
+npm install --save-dev @stryker-mutator/core @stryker-mutator/jest-runner
+npx stryker init
+```
+Introduz mutações no código e verifica se os testes as detectam.
+Mutation score ≥ 70% é um indicador de testes de qualidade real.
+
+### Pipeline de CI — fases com as novas ferramentas
+
+As fases de lint e quality agora incluem as ferramentas acima para projetos JS/TS:
+
+```
+lint-backend    → golangci-lint / flake8 / checkstyle / phpstan (por stack)
+lint-frontend   → biome ci . (JS/TS: lint + format)
+knip            → npx knip (código morto)
+arch-contract   → npx depcruise (contratos arquiteturais)
+test            → testes unitários + integração
+sonarqube       → Quality Gate
+build           → docker build
+security        → govulncheck / npm audit / dependabot
+push            → registry Harbor
+deploy-*        → GitOps ArgoCD
+```
+
+## Issues, branches e Pull Requests — fluxo obrigatório
+
+**Toda tarefa começa com uma Issue. Nenhum branch é criado sem Issue.**
+
+Três tipos: 🐛 `bug` (correção), ✨ `enhancement` (melhoria), 🚀 `feature` (nova função).
+
+**Branch sempre prefixado com o número da Issue:**
+```
+feature/42-cadastro-usuario
+fix/87-paginacao-overflow
+hotfix/99-csrf-token
+```
+
+**PR sempre referencia a Issue:**
+- Título: `feat: cadastro de usuário (#42)`
+- Corpo inclui `Closes #42` — fecha a Issue automaticamente no merge
+- Descrição: o que foi feito, como testar
+
+Os agentes não criam branches nem Issues diretamente — isso é responsabilidade
+do desenvolvedor humano. Mas ao comunicar o que foi implementado, o agente
+deve informar qual Issue deve ser criada/atualizada e qual seria o título
+sugerido para o PR, seguindo o padrão Conventional Commits.
+
+
 
 Todo sistema multiagente precisa de uma cadeia de autoridade clara.
 Quando dois agentes discordam, ou quando um agente questiona a decisão de

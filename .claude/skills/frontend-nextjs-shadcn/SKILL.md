@@ -10,6 +10,73 @@ description: Use ao implementar frontend em Next.js com shadcn/ui, quando projec
 > de nomear arquivos, componentes ou hooks. Exemplo de árvore de pastas
 > completa em `examples/folder-structures/frontend-nextjs-shadcn.md`.
 
+## Qualidade e contratos de código (Biome, knip, dependency-cruiser)
+
+> Regra universal em `CLAUDE.md`. Configurar na primeira entrega do projeto.
+> Arquivos de exemplo em `examples/quality/`.
+
+### Biome — lint + format (substitui ESLint + Prettier)
+
+```bash
+npm install --save-dev @biomejs/biome
+cp examples/quality/biome.json .
+```
+
+```json
+// package.json — scripts
+{
+  "scripts": {
+    "lint":       "biome lint .",
+    "format":     "biome format --write .",
+    "check":      "biome check .",
+    "ci:quality": "biome ci ."
+  }
+}
+```
+
+No CI: `npm run ci:quality` — falha com exit 1 se houver lint ou formatação incorreta.
+
+### knip — detectar código morto
+
+```bash
+npm install --save-dev knip
+cp examples/quality/knip.config.ts .
+```
+
+```json
+// package.json
+{ "scripts": { "knip": "knip" } }
+```
+
+### dependency-cruiser — contratos arquiteturais
+
+```bash
+npm install --save-dev dependency-cruiser
+cp examples/quality/.dependency-cruiser.js .
+```
+
+```json
+// package.json
+{
+  "scripts": {
+    "arch:check":   "depcruise src --config .dependency-cruiser.js",
+    "arch:diagram": "depcruise src --output-type dot | dot -T svg > architecture.svg"
+  }
+}
+```
+
+Valida em CI que `shared/` nunca importa de `features/`, que `features/`
+não se importam diretamente entre si, e que não há dependências circulares.
+
+### commitlint + husky — Conventional Commits
+
+```bash
+npm install --save-dev @commitlint/cli @commitlint/config-conventional husky
+npx husky init
+echo "npx --no -- commitlint --edit \$1" > .husky/commit-msg
+cp examples/quality/commitlint.config.js .
+```
+
 ## ⚠️ Verificar versão antes de implementar
 
 ```bash
@@ -1260,6 +1327,195 @@ export function RichTextEditor({
 
 **O backend sanitiza antes de persistir** — ver `CLAUDE.md` "Editor de texto rico".
 sanitização equivalente no lado do cliente também.
+
+## Skeleton, lazy loading e animações (Framer Motion)
+
+> Padrão universal em `CLAUDE.md`. Implementar em todo componente com conteúdo assíncrono.
+
+```bash
+npm install framer-motion
+```
+
+### Skeleton — componente em shared/ui/
+
+```tsx
+// components/shared/ui/skeleton.tsx
+import { cn } from '@/lib/utils'
+
+export function Skeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn(
+      'animate-pulse rounded-md bg-muted',
+      className
+    )} />
+  )
+}
+
+// Skeleton de linha de tabela — mesma estrutura da linha real
+export function SkeletonTableRow() {
+  return (
+    <tr className="border-b">
+      <td className="p-4"><Skeleton className="h-4 w-48" /></td>
+      <td className="p-4"><Skeleton className="h-4 w-24" /></td>
+      <td className="p-4"><Skeleton className="h-4 w-32" /></td>
+      <td className="p-4">
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <Skeleton className="h-8 w-8 rounded-full" />
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+// Skeleton de card — mesma estrutura do card real
+export function SkeletonCard() {
+  return (
+    <div className="border rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      </div>
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-3/4" />
+    </div>
+  )
+}
+```
+
+### Lazy loading de rotas e componentes pesados
+
+```tsx
+// Rotas: Next.js App Router faz code splitting automaticamente por page.tsx
+
+// Componentes pesados: import dinâmico só quando necessário
+import dynamic from 'next/dynamic'
+
+const MapEditor = dynamic(
+  () => import('@/components/shared/geo/map-editor'),
+  {
+    loading: () => <Skeleton className="h-[400px] w-full rounded-md" />,
+    ssr: false,   // Leaflet não funciona em SSR
+  }
+)
+
+const RichTextEditor = dynamic(
+  () => import('@/components/shared/forms/rich-text-editor'),
+  { loading: () => <Skeleton className="h-48 w-full rounded-md" /> }
+)
+```
+
+### Animações com Framer Motion
+
+```tsx
+// Variantes reutilizáveis — definir uma vez, importar onde precisar
+// lib/animations.ts
+export const fadeIn = {
+  hidden:  { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.2 } },
+  exit:    { opacity: 0, transition: { duration: 0.15 } },
+}
+
+export const slideUp = {
+  hidden:  { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } },
+  exit:    { opacity: 0, y: 8, transition: { duration: 0.15 } },
+}
+
+export const scaleModal = {
+  hidden:  { opacity: 0, scale: 0.95 },
+  visible: { opacity: 1, scale: 1,    transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } },
+  exit:    { opacity: 0, scale: 0.95, transition: { duration: 0.15 } },
+}
+
+export const staggerList = {
+  visible: { transition: { staggerChildren: 0.04 } }  // 40ms entre itens
+}
+```
+
+```tsx
+// Modal com animação
+import { motion, AnimatePresence } from 'framer-motion'
+import { scaleModal, fadeIn } from '@/lib/animations'
+
+export function Modal({ open, children }: { open: boolean; children: React.ReactNode }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            className="fixed inset-0 bg-black/50 z-40"
+            variants={fadeIn} initial="hidden" animate="visible" exit="exit"
+          />
+          {/* Modal */}
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            variants={scaleModal} initial="hidden" animate="visible" exit="exit"
+          >
+            <div className="bg-background rounded-lg p-6 max-w-md w-full shadow-xl">
+              {children}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// Lista com stagger
+import { staggerList, slideUp } from '@/lib/animations'
+
+export function AnimatedList({ items }: { items: Item[] }) {
+  return (
+    <motion.ul variants={staggerList} initial="hidden" animate="visible">
+      {items.map(item => (
+        <motion.li key={item.id} variants={slideUp}>
+          <ItemCard item={item} />
+        </motion.li>
+      ))}
+    </motion.ul>
+  )
+}
+
+// Transição de skeleton → conteúdo
+export function FadeContent({ loading, children }: { loading: boolean; children: React.ReactNode }) {
+  return (
+    <AnimatePresence mode="wait">
+      {loading ? (
+        <motion.div key="skeleton" {...fadeIn}>
+          <SkeletonCard />
+        </motion.div>
+      ) : (
+        <motion.div key="content" variants={slideUp} initial="hidden" animate="visible">
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+```
+
+### Imagens com lazy loading
+
+```tsx
+import Image from 'next/image'
+
+// Next.js Image já faz lazy loading por padrão
+// placeholder="blur" mostra versão borrada enquanto carrega
+<Image
+  src={url}
+  alt={alt}
+  width={400}
+  height={300}
+  placeholder="blur"
+  blurDataURL="data:image/png;base64,..."   // gerar via plaiceholder ou similar
+  className="rounded-md transition-opacity duration-300"
+/>
+```
 
 ## Anti-padrões de design — detectar antes de entregar
 

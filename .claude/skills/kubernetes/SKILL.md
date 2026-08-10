@@ -298,6 +298,7 @@ variables:
 
 stages:
   - lint
+  - quality
   - test
   - sonarqube
   - build
@@ -307,13 +308,34 @@ stages:
   - deploy-staging
   - deploy-prod
 
-# ─── Lint ───────────────────────────────────────────────────────────────────
-lint:
+# ─── Lint backend (por stack) ────────────────────────────────────────────────
+lint-backend:
   stage: lint
   script:
-    - docker compose -f docker-compose.yaml run --rm backend <comando-lint>
-    - docker compose -f docker-compose.yaml run --rm frontend npm run lint
+    - docker compose run --rm backend <golangci-lint run | flake8 | checkstyle | phpstan>
   only: [merge_requests, main, staging]
+
+# ─── Lint + Format frontend (Biome) ─────────────────────────────────────────
+lint-frontend:
+  stage: lint
+  script:
+    - docker compose run --rm frontend npm run ci:quality   # biome ci .
+  only: [merge_requests, main, staging]
+
+# ─── Código morto (knip) ────────────────────────────────────────────────────
+knip:
+  stage: quality
+  script:
+    - docker compose run --rm frontend npx knip
+  allow_failure: true   # avisar sem bloquear no início; mudar para false quando limpo
+  only: [main, staging]
+
+# ─── Contratos arquiteturais (dependency-cruiser) ────────────────────────────
+arch-contract:
+  stage: quality
+  script:
+    - docker compose run --rm frontend npm run arch:check
+  only: [main, staging]
 
 # ─── Testes ─────────────────────────────────────────────────────────────────
 test:

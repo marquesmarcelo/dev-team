@@ -169,7 +169,15 @@ as implementações reais chegam depois.
 - [ ] Handler segue contrato exato de `design.md`
 - [ ] `/autocomplete` implementado se `ux.md` indicar
 - [ ] Componente implementa `ux.md` (se houver UI)
-- [ ] Se primeira feature com UI + stack Angular+DSGOV: iniciar com
+- [ ] **Todo componente com conteúdo assíncrono** tem skeleton (não spinner isolado)
+      — estrutura do skeleton reflete o layout real do conteúdo
+- [ ] Imagens com `loading="lazy"` + placeholder de mesma proporção
+- [ ] Rotas com lazy loading (code splitting por página)
+- [ ] Componentes pesados (mapa, editor rico) com import dinâmico
+- [ ] Modal, drawer, dropdown e collapse com animação de entrada/saída
+- [ ] `prefers-reduced-motion` no globals desabilita animações decorativas
+- [ ] Se projeto JS/TS (Next.js, Angular, NestJS): `biome.json`, `knip.config.ts`,
+      `.dependency-cruiser.js` e `commitlint.config.js` presentes (copiar de `examples/quality/`)
       `git clone` do quickstart oficial (ver skill `frontend-angular-dsgov`)
       e ajustar apenas o menu lateral para os itens do projeto
 - [ ] Se primeira feature com UI: AppShell com **indicador de navegação**
@@ -197,9 +205,11 @@ Não acione `security-reviewer`, `code-reviewer`, `qa-tester` nem
 > "Feature **\<nome\>** implementada e rodando.
 > Comando para testar: `docker compose -f docker-compose.yaml -f docker-compose.dev.yml up`
 >
+> **Sugestão de Issue/PR:**
+> - Issue: 🚀 `feature` — \<título descritivo do que foi implementado\>
+> - Branch: `feature/<N>-<nome-da-feature>` (substituir \<N\> pelo número da Issue)
+> - PR title: `feat: \<descrição\> (#N)`
+>
 > Quando terminar de testar, me diga:
 > - **'Aprovado'** → prossigo com revisão de segurança, QA e documentação
 > - **'Tem problemas: \<descrição\>'** → corrijo antes de revisar"
-
-**Nunca avançar para a fase de revisão sem confirmação explícita.**
-Revisar código que vai ser reescrito é desperdício de tokens e tempo.

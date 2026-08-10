@@ -64,3 +64,17 @@ Achados → `specs/<feature>/evidence.md` seção "Achados de qualidade".
 - Comportamento implementado diverge do spec.md? → Médio (código ou spec errado)
 - spec.md tem decisões riscadas ou seções "descartado"? → Baixo (limpar)
 - Mudança relevante de comportamento sem atualizar spec.md? → Alto
+
+**Skeleton, lazy loading e animações** (CLAUDE.md "Padrão universal de UX em movimento")
+- Componente com dados assíncronos sem skeleton → 🟡 Moderado
+- Imagens sem `loading="lazy"` fora do fold → 🟢 Menor
+- Modal/drawer/dropdown sem animação de entrada/saída → 🟢 Menor
+- `prefers-reduced-motion` ausente no globals com animações definidas → 🟡 Moderado
+- Spinner centralizado isolado em vez de skeleton de layout → 🟡 Moderado
+
+**Ferramentas de qualidade JS/TS** (CLAUDE.md "Ferramentas de qualidade")
+- `biome.json` ausente em projeto JS/TS → 🟡 Moderado
+- `knip.config.ts` ausente → 🟢 Menor
+- `.dependency-cruiser.js` ausente → 🟡 Moderado (sem validação de arquitetura)
+- `commitlint.config.js` + `.husky/commit-msg` ausentes → 🟢 Menor
+- Violação de contrato arquitetural (`shared/` importando `features/`, `domain/` importando `adapter/`) → 🔴 Crítico

@@ -59,7 +59,13 @@ antes de continuar.
       `.claude/worktrees/`, `.claude/scheduled_tasks.lock`, `.claude/settings.local.json`
 - [ ] `.gitignore` na raiz, backend e frontend (específico por linguagem)
 - [ ] .env.example atualizado (incluindo SYSLOG_SERVER, PROMETHEUS_PUSHGATEWAY_URL, SONAR_TOKEN)
-- [ ] sonar-project.properties na raiz
+- [ ] `sonar-project.properties` na raiz
+- [ ] Para projetos JS/TS (Next.js, Angular, NestJS):
+      - [ ] `biome.json` (copiar de `examples/quality/biome.json` e ajustar)
+      - [ ] `knip.config.ts` (copiar de `examples/quality/knip.config.ts` e ajustar entrypoints)
+      - [ ] `.dependency-cruiser.js` (copiar de `examples/quality/.dependency-cruiser.js`)
+      - [ ] `commitlint.config.js` + `.husky/commit-msg` configurados
+      - [ ] Scripts adicionados ao `package.json`: `lint`, `check`, `knip`, `arch:check`
 - [ ] Pipeline CI com 9 fases
 - [ ] Probes K8s com path correto para a stack
 - [ ] Nenhum segredo em texto plano
