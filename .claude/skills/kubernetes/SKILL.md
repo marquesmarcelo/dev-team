@@ -337,11 +337,11 @@ arch-contract:
     - docker compose run --rm frontend npm run arch:check
   only: [main, staging]
 
-# ─── Testes ─────────────────────────────────────────────────────────────────
+# ─── Testes unitários + smoke ────────────────────────────────────────────────
 test:
   stage: test
   script:
-    - docker compose -f docker-compose.yaml run --rm backend <comando-teste>
+    - docker compose -f docker-compose.yaml run --rm backend <comando-teste-unitario>
   coverage: '/coverage: \d+\.\d+%/'
   artifacts:
     reports:
@@ -349,6 +349,18 @@ test:
         coverage_format: cobertura
         path: coverage/cobertura-coverage.xml
   only: [merge_requests, main, staging]
+
+# ─── E2E / Hardening (manual — acionado pelo dono do produto) ────────────────
+e2e-hardening:
+  stage: test
+  when: manual          # nunca automático — "rode os testes E2E" para acionar
+  script:
+    - docker compose run --rm playwright npx playwright test
+  artifacts:
+    when: always
+    paths: [playwright-report/]
+    expire_in: 7 days
+  only: [main, staging]
 
 # ─── SonarQube ──────────────────────────────────────────────────────────────
 sonarqube:

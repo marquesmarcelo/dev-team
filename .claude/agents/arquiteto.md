@@ -144,20 +144,22 @@ Só então coordene o time.
 6. ⛔ PARE — aguarda aprovação final do usuário
         ↓ "Aprovado para produção"
 7. FASE RELEASE:
+   - dev-fullstack escreve testes E2E dos fluxos críticos da release
+   - qa-tester executa suíte Playwright → evidence-e2e.md
    - dba gera specs/releases/vX.Y/release.sql (up + down num único arquivo)
    - tech-writer congela openapi.yaml + atualiza CHANGELOG.md
    - dev-fullstack atualiza VERSION na raiz + endpoint /version
    - specs/_status.md registra versão como "lançada"
         ↓
-8. tech-writer → dev-docker-compose → deploy
+8. dev-docker-compose → deploy
 ```
 
 **Nunca avançar para revisão sem:**
 - Confirmação explícita do usuário de que testou
-- Migrations consolidadas pelo `dba` (migrations incrementais viram uma só)
+- Migrations consolidadas pelo `dba`
 
 **Nunca avançar para deploy sem:**
-- Fase Release concluída (VERSION, release.sql, CHANGELOG)
+- Fase Release concluída (E2E, VERSION, release.sql, CHANGELOG)
 
 ## Após aprovação de feature pelo qa-tester
 

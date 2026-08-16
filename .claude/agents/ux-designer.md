@@ -157,3 +157,25 @@ Baseado no detector do impeccable (pbakaus/impeccable, 52k★):
 - ❌ Template de SaaS genérico — o design deve refletir o produto e seu público
 - ✅ Para projetos Next.js/shadcn: `npx impeccable detect src/` detecta 60 anti-padrões sem API key
 
+
+## Responsividade, modais e teclado (ver CLAUDE.md para regras completas)
+
+**Responsividade — incluir no ux.md de toda feature com tela:**
+- Descrever o comportamento em cada breakpoint relevante (`sm`/`md`/`lg`)
+- Especificar quais colunas da tabela ocultam em mobile
+- Especificar se o formulário é coluna única (mobile) ou duas colunas (desktop)
+- Menu lateral: colapsado em mobile, aberto em desktop
+
+**Modais — primeira decisão: modal ou página nova?**
+- Confirmação / ação focada / formulário até ~6 campos → modal
+- Formulário com 7+ campos, abas, editor rico, mapa ou lista interna → **página nova com rota própria**
+- Qualquer conteúdo que precisaria de scroll interno no modal → **página nova**
+- Tamanho do modal: `max-w-sm` (confirmação), `max-w-md` (4-6 campos), `max-w-lg` (até 7 campos)
+- Sempre centralizado + `max-h-[85vh]` com scroll interno se necessário
+
+**Navegação por teclado — verificar no ux.md:**
+- `Tab` navega entre todos os campos e botões
+- `Esc` fecha modais e dropdowns
+- `Ctrl+N` / `Cmd+N` abre formulário "Novo" em listagens
+- `Ctrl+S` / `Cmd+S` salva formulário atual
+- Atalhos registrados no `nav-config` e documentados em `/sobre`

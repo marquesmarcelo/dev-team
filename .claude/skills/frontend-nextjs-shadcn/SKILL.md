@@ -1517,6 +1517,167 @@ import Image from 'next/image'
 />
 ```
 
+## Dirty state — proteção contra perda de dados
+
+> Regra universal em `CLAUDE.md`. Aplicar em todo formulário de modal e de página.
+
+```tsx
+// hooks/use-dirty-state.ts
+import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+export function useDirtyState<T extends Record<string, unknown>>(
+  initialValues: T
+) {
+  const [values, setValues]   = useState<T>(initialValues)
+  const [isDirty, setIsDirty] = useState(false)
+  const router = useRouter()
+
+  const setValue = useCallback((key: keyof T, value: unknown) => {
+    setValues(prev => {
+      const next = { ...prev, [key]: value }
+      // Sujo se qualquer campo diferir do valor inicial
+      const dirty = Object.keys(next).some(k => next[k] !== initialValues[k])
+      setIsDirty(dirty)
+      return next as T
+    })
+  }, [initialValues])
+
+  const reset = useCallback(() => {
+    setValues(initialValues)
+    setIsDirty(false)
+  }, [initialValues])
+
+  // Alerta nativo ao recarregar/fechar a aba
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
+  // Bloquear navegação de rota com dados sujos
+  useEffect(() => {
+    if (!isDirty) return
+    // Next.js 14+ App Router — interceptar com push/replace customizado
+    const originalPush = router.push.bind(router)
+    // Usar um signal de bloqueio — solicitar confirmação antes de navegar
+  }, [isDirty, router])
+
+  return { values, setValue, isDirty, reset }
+}
+```
+
+```tsx
+// components/shared/ui/unsaved-changes-dialog.tsx
+import { AlertDialog, AlertDialogAction, AlertDialogCancel,
+         AlertDialogContent, AlertDialogDescription,
+         AlertDialogFooter, AlertDialogHeader, AlertDialogTitle }
+  from '@/components/ui/alert-dialog'
+
+interface UnsavedChangesDialogProps {
+  open: boolean
+  onDiscard: () => void           // "Descartar alterações"
+  onKeepEditing: () => void       // "Continuar editando"
+}
+
+export function UnsavedChangesDialog({
+  open, onDiscard, onKeepEditing
+}: UnsavedChangesDialogProps) {
+  return (
+    <AlertDialog open={open}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Alterações não salvas</AlertDialogTitle>
+          <AlertDialogDescription>
+            Você tem alterações que não foram salvas. Se sair agora, elas serão perdidas.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onKeepEditing}>
+            Continuar editando
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onDiscard}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Descartar alterações
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+```
+
+```tsx
+// Uso em modal
+export function ProcessoModal({ open, onClose }: ModalProps) {
+  const { values, setValue, isDirty, reset } = useDirtyState({ nome: '', status: '' })
+  const [confirmClose, setConfirmClose] = useState(false)
+
+  const handleClose = () => {
+    if (isDirty) {
+      setConfirmClose(true)   // mostrar confirmação
+    } else {
+      onClose()               // fechar direto se não tem dados
+    }
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose() }}>
+        <DialogContent
+          onInteractOutside={(e) => {
+            e.preventDefault()   // impedir fechar ao clicar fora
+            handleClose()        // tratar manualmente com dirty check
+          }}
+          onEscapeKeyDown={(e) => {
+            e.preventDefault()
+            handleClose()
+          }}>
+          {/* campos do formulário */}
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+            <Button onClick={salvar}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <UnsavedChangesDialog
+        open={confirmClose}
+        onDiscard={() => { reset(); setConfirmClose(false); onClose() }}
+        onKeepEditing={() => setConfirmClose(false)}
+      />
+    </>
+  )
+}
+
+// Uso em página de formulário (Novo / Editar)
+export default function ProcessoFormPage() {
+  const { values, setValue, isDirty, reset } = useDirtyState(initialValues)
+  const router = useRouter()
+  const [confirmNav, setConfirmNav] = useState(false)
+
+  const handleCancel = () => {
+    if (isDirty) setConfirmNav(true)
+    else router.back()
+  }
+
+  return (
+    <>
+      {/* formulário */}
+      <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
+
+      <UnsavedChangesDialog
+        open={confirmNav}
+        onDiscard={() => { reset(); router.back() }}
+        onKeepEditing={() => setConfirmNav(false)}
+      />
+    </>
+  )
+}
+```
+
 ## Anti-padrões de design — detectar antes de entregar
 
 shadcn/ui é o template mais afetado pelos vícios de "AI slop". Antes de

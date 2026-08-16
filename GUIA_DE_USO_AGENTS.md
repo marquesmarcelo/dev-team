@@ -240,11 +240,14 @@ Depois diga:
 ```
 security-reviewer + code-reviewer  ─── em paralelo
                ↓
-qa-tester → evidence.md
+qa-tester → unit tests + smoke → evidence.md
                ↓ PARE ✅ aprovação final é sua
                ↓
 tech-writer → dev-docker-compose
 ```
+
+> **E2E não roda nesta fase.** O Playwright entra na Fase Release (Passo 8),
+> quando os requisitos estão estabilizados e os testes terão vida longa.
 
 ---
 
@@ -253,17 +256,20 @@ tech-writer → dev-docker-compose
 > "Declaramos a versão 1.0"
 
 O arquiteto coordena:
-1. `VERSION` atualizado na raiz: `echo "1.0.0" > VERSION`
-2. `dba` gera `specs/releases/v1.0/release.sql` (UP + DOWN num arquivo único)
-3. `tech-writer` congela `specs/releases/v1.0/openapi.yaml` + `CHANGELOG.md`
-4. `dev-fullstack` confirma endpoint `/version` e página `/sobre` atualizados
-5. `specs/_status.md` registra versão como "lançada"
+1. `dev-fullstack` escreve os **testes E2E** dos fluxos críticos da release
+   (é aqui que o Playwright entra — requisitos estabilizados, E2E terá vida longa)
+2. `qa-tester` executa a suíte E2E completa → `evidence-e2e.md`
+3. `dba` gera `specs/releases/v1.0/release.sql` (UP + DOWN)
+4. `tech-writer` congela `specs/releases/v1.0/openapi.yaml` + `CHANGELOG.md`
+5. `dev-fullstack` atualiza `VERSION` + endpoint `/version`
+6. `specs/_status.md` registra versão como "lançada"
 
 ```
 specs/releases/v1.0/
-  release.sql   ← schema completo (-- UP) + rollback (-- DOWN) num arquivo
-  openapi.yaml  ← contrato da API congelado
-  CHANGELOG.md  ← o que foi entregue
+  release.sql       ← schema completo + rollback
+  openapi.yaml      ← contrato da API congelado
+  CHANGELOG.md      ← o que foi entregue
+  evidence-e2e.md   ← resultado dos testes E2E desta release
 ```
 
 ---

@@ -78,3 +78,19 @@ Achados → `specs/<feature>/evidence.md` seção "Achados de qualidade".
 - `.dependency-cruiser.js` ausente → 🟡 Moderado (sem validação de arquitetura)
 - `commitlint.config.js` + `.husky/commit-msg` ausentes → 🟢 Menor
 - Violação de contrato arquitetural (`shared/` importando `features/`, `domain/` importando `adapter/`) → 🔴 Crítico
+
+**Responsividade, modais e teclado** (CLAUDE.md "Padrão universal de UX")
+- Interface não responsiva (sem breakpoints ou layout fixo em px) → 🟡 Moderado
+- Modal sem `max-h-[90vh]` e sem scroll interno → 🟢 Menor
+- Modal não centralizado na viewport → 🟡 Moderado
+- Modal com tamanho inadequado ao conteúdo (grande demais ou pequeno demais) → 🟢 Menor
+- `Tab` não navega entre campos em ordem lógica → 🟡 Moderado
+- `Esc` não fecha modal aberto → 🟡 Moderado
+- `outline: none` sem alternativa de foco visível → 🟡 Moderado (acessibilidade)
+- Sem focus trap em modal aberto → 🟡 Moderado
+
+**Dirty state** (CLAUDE.md "Proteção contra perda de dados")
+- Modal sem proteção de dirty state (fecha ao clicar fora sem confirmar) → 🟡 Moderado
+- Página de formulário sem `UnsavedChangesGuard` / bloqueio de navegação → 🟡 Moderado
+- Botão "Cancelar" que descarta dados sem confirmação → 🟡 Moderado
+- `beforeunload` ausente em página com formulário → 🟢 Menor

@@ -1353,6 +1353,147 @@ export const listStaggerAnimation = trigger('listStagger', [
 })
 ```
 
+## Dirty state — proteção contra perda de dados
+
+> Regra universal em `CLAUDE.md`. Aplicar em todo formulário de modal e de página.
+
+```typescript
+// core/guards/unsaved-changes.guard.ts
+import { Injectable, inject } from '@angular/core'
+import { CanDeactivate } from '@angular/router'
+
+export interface HasUnsavedChanges {
+  isDirty: () => boolean
+}
+
+@Injectable({ providedIn: 'root' })
+export class UnsavedChangesGuard implements CanDeactivate<HasUnsavedChanges> {
+  canDeactivate(component: HasUnsavedChanges): boolean {
+    if (!component.isDirty()) return true
+    return window.confirm(
+      'Você tem alterações não salvas. Deseja descartá-las e sair?'
+    )
+  }
+}
+
+// app.routes.ts — adicionar guard nas rotas de formulário
+{
+  path: 'processos/novo',
+  component: ProcessoFormComponent,
+  canDeactivate: [UnsavedChangesGuard]
+}
+```
+
+```typescript
+// shared/ui/unsaved-changes-dialog/unsaved-changes-dialog.component.ts
+@Component({
+  selector: 'app-unsaved-changes-dialog',
+  standalone: true,
+  template: `
+    @if (visible) {
+      <div class="dialog-overlay" (click)="keepEditing()">
+        <div class="dialog" role="alertdialog"
+             aria-labelledby="dialog-title"
+             aria-describedby="dialog-desc"
+             (click)="$event.stopPropagation()">
+          <h2 id="dialog-title">Alterações não salvas</h2>
+          <p id="dialog-desc">
+            Você tem alterações que não foram salvas.
+            Se sair agora, elas serão perdidas.
+          </p>
+          <div class="actions">
+            <br-button emphasis="secondary" (click)="keepEditing()">
+              Continuar editando
+            </br-button>
+            <br-button emphasis="primary" danger (click)="discard()">
+              Descartar alterações
+            </br-button>
+          </div>
+        </div>
+      </div>
+    }
+  `
+})
+export class UnsavedChangesDialogComponent {
+  @Input()  visible = false
+  @Output() discardChanges  = new EventEmitter<void>()
+  @Output() continueEditing = new EventEmitter<void>()
+
+  discard()      { this.discardChanges.emit() }
+  keepEditing()  { this.continueEditing.emit() }
+}
+```
+
+```typescript
+// features/processo/processo-form.component.ts
+@Component({
+  standalone: true,
+  imports: [ReactiveFormsModule, GovbrDsWebcomponentsModule,
+            UnsavedChangesDialogComponent],
+  template: `
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+      <!-- campos -->
+      <br-button emphasis="secondary" (click)="cancelar()">Cancelar</br-button>
+      <br-button type="submit" emphasis="primary" [loading]="salvando()">Salvar</br-button>
+    </form>
+
+    <app-unsaved-changes-dialog
+      [visible]="mostrarConfirmacao()"
+      (discardChanges)="descartarENavegar()"
+      (continueEditing)="mostrarConfirmacao.set(false)">
+    </app-unsaved-changes-dialog>
+  `
+})
+export class ProcessoFormComponent implements HasUnsavedChanges, OnInit {
+  mostrarConfirmacao = signal(false)
+  private pendingAction?: () => void
+
+  form = inject(FormBuilder).group({
+    nome:   ['', Validators.required],
+    status: ['', Validators.required],
+  })
+
+  private valoresIniciais = this.form.value
+
+  isDirty(): boolean {
+    return JSON.stringify(this.form.value) !== JSON.stringify(this.valoresIniciais)
+  }
+
+  cancelar() {
+    if (this.isDirty()) {
+      this.pendingAction = () => this.router.back()
+      this.mostrarConfirmacao.set(true)
+    } else {
+      this.router.back()
+    }
+  }
+
+  descartarENavegar() {
+    this.mostrarConfirmacao.set(false)
+    this.pendingAction?.()
+  }
+
+  // Para uso em modal — interceptar fechamento
+  tentarFechar(onClose: () => void) {
+    if (this.isDirty()) {
+      this.pendingAction = onClose
+      this.mostrarConfirmacao.set(true)
+    } else {
+      onClose()
+    }
+  }
+}
+```
+
+**Alerta nativo ao recarregar:**
+```typescript
+// No componente de formulário (página ou modal)
+@HostListener('window:beforeunload', ['$event'])
+onBeforeUnload(event: BeforeUnloadEvent) {
+  if (this.isDirty()) event.preventDefault()
+}
+```
+
 ## Dois Dockerfiles
 
 - `Dockerfile` — produção: `node:20-alpine` builder + `nginx:alpine` runner

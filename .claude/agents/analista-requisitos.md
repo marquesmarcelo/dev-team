@@ -80,7 +80,15 @@ Para a feature descrita, crie `specs/<feature>/spec.md` com:
 
 Após o spec.md, gere um wireframe ASCII para cada tela envolvida e inclua
 na seção `## Wireframes` do próprio `spec.md`. O wireframe é um esboço de
-validação — não um design final. Objetivo: o usuário ver a estrutura antes
+validação — não um design final.
+
+**Antes de desenhar o wireframe, decidir: modal ou página nova?**
+- Formulário com até ~6 campos simples → modal
+- Formulário com 7+ campos, abas, editor rico, mapa, listas internas → **página nova com rota própria**
+- Registrar a decisão no spec.md e apresentar ao usuário para validação
+
+Indicar no wireframe o breakpoint — desenhar versão mobile se o comportamento
+for diferente do desktop: Objetivo: o usuário ver a estrutura antes
 de acionar o `ux-designer`.
 
 **Notação:**
@@ -212,3 +220,27 @@ Informe ao usuário:
 - Opcional: "Posso acionar o ai-consultor para sugerir onde IA agrega valor"
 
 **PARE** e aguarde confirmação explícita antes de qualquer próximo passo.
+
+## E2E antecipado — quando justificar no spec.md
+
+Por padrão, testes E2E (Playwright) são adiados para a fase de hardening
+e acionados pelo usuário. No entanto, ao levantar requisitos, avaliar se
+o caso de uso justifica E2E antecipado:
+
+**Justifica E2E antecipado:**
+- Fluxo de autenticação crítico (login, MFA, recuperação de senha)
+- Processo irreversível de alto impacto (exclusão em massa, envio de e-mail em lote)
+- Integração complexa com serviço externo (pagamento, assinatura digital)
+- Caso de uso com múltiplos estados interdependentes e risco de regressão
+
+**Não justifica E2E antecipado:**
+- CRUD simples com validações de formulário
+- Listagens com filtros e paginação
+- Funcionalidades visuais sujeitas a mudança de requisito
+
+Se justificar, registrar no `spec.md`:
+```markdown
+## Estratégia de testes
+- Unit tests: obrigatório
+- E2E antecipado: **sim** — motivo: <justificativa>
+```

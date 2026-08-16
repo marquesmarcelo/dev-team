@@ -1035,6 +1035,168 @@ shared/
 - Código de UI copiado entre features → extrair para `shared/` com props que cubram as variações
 - Quando uma categoria de `shared/` crescer demais, criar subcategoria (ex: `shared/ui/feedback/` para estados de loading/erro)
 
+### Responsividade — mobile-first obrigatório
+
+Todo sistema deve funcionar em **celular, tablet e desktop**. A abordagem
+é mobile-first: projetar para a tela menor primeiro e expandir.
+
+**Breakpoints padrão:**
+
+| Nome | Largura | Dispositivo típico |
+|---|---|---|
+| `sm` | ≥ 640px | Celular paisagem, celular grande |
+| `md` | ≥ 768px | Tablet retrato |
+| `lg` | ≥ 1024px | Tablet paisagem, laptop pequeno |
+| `xl` | ≥ 1280px | Desktop |
+
+**Regras por elemento:**
+
+- **Menu lateral (sidebar):** colapsado por padrão em `sm`/`md`, aberto em `lg`+
+  — acionar via botão hamburguer no header
+- **Grid/tabela:** em `sm`, colunas secundárias ocultam; mostrar só as colunas
+  essenciais. Alternativa: card-view em vez de tabela em telas pequenas
+- **Formulários:** coluna única em `sm`, duas colunas em `md`+
+- **Breadcrumb:** ocultar itens intermediários em `sm` com elipses (`…`)
+- **Botões de ação:** em `sm`, apenas ícone; em `md`+, ícone + texto
+- **Modais:** ver regras abaixo
+
+**Não usar `px` fixo para larguras de container** — usar `max-w-*` com `w-full`
+para que o container ocupe a tela toda em mobile e tenha limite em desktop.
+
+---
+
+### Modais — dimensionamento proporcional ao conteúdo
+
+**Primeira decisão: modal ou página nova?**
+
+Antes de projetar um modal, avaliar se o conteúdo cabe ali:
+
+| Situação | Usar |
+|---|---|
+| Confirmação de ação ("Excluir este registro?") | Modal simples |
+| Formulário com até ~6 campos, sem abas | Modal |
+| Formulário com 7+ campos, abas, editor rico, mapa ou lista interna | **Página nova** |
+| Visualização de detalhe com muitos dados | **Página nova** |
+| Qualquer conteúdo que precisaria de scroll interno no modal | **Página nova** |
+
+**Regra prática:** se o usuário vai gastar mais de 1-2 minutos preenchendo
+o formulário, ou se o formulário tem seções distintas, vai para página nova.
+Modal é para ações rápidas e focadas — não para substituir telas completas.
+
+**Tamanho do modal** (quando a decisão for modal):
+
+| Conteúdo | Largura |
+|---|---|
+| Confirmação (1-3 elementos) | `max-w-sm` (384px) |
+| Formulário pequeno (4-6 campos) | `max-w-md` (448px) |
+| Formulário médio com contexto | `max-w-lg` (512px) |
+
+**Proteção contra perda de dados (dirty state) — obrigatório:**
+
+Sempre que o usuário tiver preenchido algum campo sem salvar, alertar
+antes de descartar os dados. Aplica-se a:
+
+| Situação | Comportamento |
+|---|---|
+| Clicar fora de modal com dados preenchidos | Modal de confirmação: "Você tem alterações não salvas. Deseja descartá-las?" |
+| Fechar modal com `Esc` com dados preenchidos | Mesma confirmação |
+| Navegar para outra rota com formulário sujo | Confirmação antes de navegar |
+| Clicar "Cancelar" com dados preenchidos | Mesma confirmação |
+| Recarregar a página com dados preenchidos | `beforeunload` nativo do browser |
+
+**Lógica de dirty state:**
+- O formulário é considerado "sujo" quando qualquer campo foi alterado
+  em relação ao valor inicial (vazio para "Novo", valor original para "Editar")
+- Confirmar apenas se dirty — se nenhum campo foi alterado, fechar sem perguntar
+- Após salvar com sucesso: limpar o dirty state
+
+**Dois botões na confirmação:**
+- "Descartar alterações" → fechar/navegar sem salvar
+- "Continuar editando" → voltar ao formulário (foco no primeiro campo)
+
+A implementação concreta vem da skill de frontend da stack configurada.
+Em mobile: 90% da largura com margem de 5% em cada lado.
+Altura: nunca fixa — `max-h-[85vh]` com scroll interno se necessário.
+
+```css
+.modal-overlay {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem; z-index: 50;
+}
+.modal-content {
+  width: 100%; max-height: 85vh; overflow-y: auto;
+  border-radius: 0.5rem;
+}
+```
+
+---
+
+### Navegação por teclado — independência do mouse
+
+Toda interface deve ser operável sem mouse. Usuários de teclado (acessibilidade,
+produtividade, usuários avançados) devem conseguir executar qualquer ação.
+
+**Padrões obrigatórios:**
+
+| Tecla | Ação | Onde aplicar |
+|---|---|---|
+| `Tab` / `Shift+Tab` | Navegar entre campos e botões | Todo formulário e modal |
+| `Enter` | Ativar botão focado / confirmar | Botões, links, itens de lista |
+| `Esc` | Fechar modal / cancelar ação | Todo modal e dropdown |
+| `Space` | Ativar checkbox / toggle | Checkboxes, switches |
+| `↑` `↓` | Navegar em lista / select | Dropdowns, selects, menus |
+| `Home` / `End` | Ir ao primeiro / último item | Listas, grids |
+
+**Atalhos de teclado da aplicação** (registrar no `nav-config` e documentar
+na página `/sobre` ou em modal de ajuda `?`):
+
+| Atalho sugerido | Ação | Contexto |
+|---|---|---|
+| `Ctrl+N` (Windows) / `Cmd+N` (Mac) | Abrir formulário "Novo" | Listagens |
+| `Ctrl+S` / `Cmd+S` | Salvar formulário atual | Formulários |
+| `Ctrl+F` / `Cmd+F` | Focar campo de pesquisa | Listagens com filtro |
+| `Esc` | Fechar modal / cancelar | Modais, drawers |
+| `?` | Abrir modal de atalhos de teclado | Global |
+
+> **Atenção:** `Ctrl+N` abre nova aba em alguns browsers. Usar `event.preventDefault()`
+> e documentar que o atalho funciona quando o foco está dentro da aplicação
+> (não no campo de URL do browser).
+
+**Implementação:**
+
+```typescript
+// Hook de atalhos de teclado — adicionar ao AppShell
+useEffect(() => {
+  const handler = (e: KeyboardEvent) => {
+    const mod = e.ctrlKey || e.metaKey  // Ctrl no Windows, Cmd no Mac
+    if (mod && e.key === 'n') { e.preventDefault(); abrirNovo() }
+    if (mod && e.key === 's') { e.preventDefault(); salvar() }
+    if (mod && e.key === 'f') { e.preventDefault(); focarPesquisa() }
+    if (e.key === '?')        { abrirAtalhos() }
+  }
+  document.addEventListener('keydown', handler)
+  return () => document.removeEventListener('keydown', handler)
+}, [])
+```
+
+**Focus trap em modais** — quando um modal está aberto, `Tab` não pode
+sair do modal. Usar `@radix-ui/react-dialog` (Next.js) ou `cdkTrapFocus`
+(Angular) que já implementam isso.
+
+**Ordem de tabulação** — a ordem visual deve corresponder à ordem de `Tab`.
+Nunca usar `tabindex > 0` exceto em casos muito específicos. Preferir
+`tabindex="0"` para elementos customizados que precisam de foco.
+
+**Indicador de foco visível** — nunca `outline: none` sem alternativa.
+O foco deve ser visível para quem navega por teclado:
+```css
+:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+```
+
 ### Indicador global de carregamento (barra superior + item/botão com loading)
 
 A barra de progresso fina no topo não é apenas um indicador de navegação —
@@ -1279,24 +1441,63 @@ feature-C → dev-fullstack
 - Refatoração de UI sem mudança de API
 - Especialistas mantêm fluxo dedicado: `dev-ia`, `dev-auth`, `dev-auditoria`
 
+### Estratégia de testes — três camadas com custos diferentes
+
+```
+CAMADA 1 — Build contínuo (sempre, em cada PR)
+  Unit tests de domínio (use cases, value objects, regras de negócio)
+  Smoke de integração (banco sobe, health endpoint responde, auth funciona)
+  → Falha = bloqueia merge. Rápido, barato, estável.
+
+CAMADA 2 — Fase de Release (junto com code review e security review)
+  `dev-fullstack` escreve os testes E2E dos fluxos críticos da release
+  `qa-tester` executa a suíte E2E completa
+  → Acionada quando o usuário declara que vai lançar a versão
+  → E2E é escrito uma vez por release, não por feature
+
+CAMADA 3 — Smoke manual do happy path
+  Usuário valida o fluxo principal antes de aprovar o release
+  → Documentado em specs/<feature>/evidence.md como "validado manualmente"
+```
+
+**Por que E2E na fase de release, não por feature:**
+- Requisitos mudam quando o cliente vê a aplicação — E2E escrito por feature
+  é reescrito junto quando os requisitos mudam
+- Unit tests capturam a maioria dos bugs com fração do custo
+- Na fase de release os requisitos estão estabilizados — E2E escrito aqui
+  tem vida longa e protege regressões em deploys futuros
+
+**Exceção — E2E antecipado:** `analista-requisitos` ou `arquiteto` podem
+decidir criar E2E durante o desenvolvimento para casos de alto risco
+(autenticação crítica, processo irreversível, integração externa complexa).
+Registrar justificativa no `spec.md`.
+
 ### Testes no fluxo do dev-fullstack
-- **Unitários (use case):** `dev-fullstack` escreve ANTES do código (TDD)
-- **E2E:** `dev-fullstack` escreve os testes Playwright ao implementar
-- **Validação:** `qa-tester` executa os testes e gera `evidence.md`
+- **Unitários (use case):** `dev-fullstack` escreve ANTES do código (TDD) — sempre
+- **Smoke de integração:** endpoints principais respondem + banco conecta
+- **E2E Playwright:** apenas se o `analista-requisitos` ou `arquiteto`
+  marcou o caso de uso como "E2E antecipado" no `spec.md`
+- **Validação:** `qa-tester` executa unit + smoke e gera `evidence.md`
 
 ### Sequencial obrigatório
 ```
 analista-requisitos → ux-designer → arquiteto → dev-fullstack(s)
         ↓
-⛔ PARE — usuário testa manualmente no ambiente de desenvolvimento
+⛔ PARE — usuário testa manualmente (smoke manual do happy path)
         ↓ (usuário aprova)
 security-reviewer + code-reviewer (em paralelo)
         ↓
-qa-tester → evidence.md
+qa-tester → unit + smoke → evidence.md
         ↓
 ⛔ PARE — aprovação final do usuário
         ↓
 tech-writer → devops
+
+─── Fase de Release (ao declarar versão estável) ────────────
+dev-fullstack escreve testes E2E dos fluxos críticos da release
+qa-tester → suíte Playwright → evidence-e2e.md
+VERSION + release.sql + openapi.yaml snapshot
+        ↓ deploy para produção
 ```
 
 **Nunca avançar para revisão sem confirmação explícita do usuário.**
@@ -1446,6 +1647,20 @@ ou Redis cluster; o adapter cuida disso.
 o container A mas o processamento acontece no container B (que não tem esse
 arquivo em disco), o sistema quebra. Arquivos vão para armazenamento externo
 (ex: S3, MinIO, volume compartilhado) — nunca em disco local do container.
+
+### Serviços opcionais padrão do projeto
+
+Quando o `project.config.md` indicar necessidade, o `dev-docker-compose`
+adiciona ao `docker-compose.yaml`:
+
+| Necessidade | Dev (local) | Produção |
+|---|---|---|
+| Armazenamento de arquivos | **MinIO** (porta 9000 API, 9001 console) | MinIO self-hosted, AWS S3, OCI |
+| Envio de e-mail | **Mailpit** (porta 1025 SMTP, 8025 UI) | SMTP corporativo, SendGrid, SES |
+| Mensageria / background jobs | **RabbitMQ** (porta 5672 AMQP, 15672 UI) | RabbitMQ self-hosted, CloudAMQP |
+
+Ambos são configurados via variáveis de ambiente — zero mudança de código
+ao trocar dev por produção. Snippets completos no `dev-docker-compose.md`.
 
 **Locks e operações que exigem exclusividade:** usar Redis (SETNX, Redlock)
 em vez de lock de processo. Ex: job que não pode rodar em paralelo em dois

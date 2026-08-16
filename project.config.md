@@ -26,6 +26,21 @@
   - Angular → `frontend-angular`
 - **Subagent correspondente:** `dev-frontend` (genérico) ou `dev-frontend-angular`
 
+## Serviços opcionais (adicionar ao docker-compose se o projeto precisar)
+
+- **Armazenamento de arquivos:** sim | não
+  - Serviço local (dev): MinIO — compatível com AWS S3 SDK
+  - Produção: MinIO self-hosted | AWS S3 | OCI Object Storage
+- **Envio de e-mail:** sim | não
+  - Serviço local (dev): Mailpit — captura e-mails sem enviar, UI em http://localhost:8025
+  - Produção: SMTP corporativo | SendGrid | SES
+- **Mensageria / background jobs:** sim | não
+  - Serviço local (dev): RabbitMQ — filas, retry, dead-letter, UI em http://localhost:15672
+  - Produção: RabbitMQ self-hosted | CloudAMQP | Amazon MQ
+
+> Quando marcar "sim", o `dev-docker-compose` adiciona o container correspondente
+> ao `docker-compose.yaml` com a configuração pronta.
+
 ## Geo (preencher se o projeto tiver dados geográficos)
 - **Habilitar geo:** sim | não
 - **PostGIS:** sempre que geo=sim

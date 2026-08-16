@@ -169,7 +169,15 @@ as implementações reais chegam depois.
 - [ ] Handler segue contrato exato de `design.md`
 - [ ] `/autocomplete` implementado se `ux.md` indicar
 - [ ] Componente implementa `ux.md` (se houver UI)
-- [ ] **Todo componente com conteúdo assíncrono** tem skeleton (não spinner isolado)
+- [ ] Formulários com dirty state: confirmar antes de fechar modal, cancelar
+      ou navegar para outra rota quando há dados não salvos
+- [ ] `beforeunload` configurado em páginas de formulário com dados sujos
+      tabela com colunas essenciais em mobile
+- [ ] Modais centralizados + tamanho proporcional ao conteúdo + `max-h-[90vh]`
+      com scroll interno + focus trap (`@radix-ui/react-dialog` ou `cdkTrapFocus`)
+- [ ] `Tab` navega entre todos os campos em ordem lógica; `Esc` fecha modais
+- [ ] Atalhos `Ctrl+N` (novo), `Ctrl+S` (salvar), `Ctrl+F` (pesquisa) implementados
+- [ ] `focus-visible` com outline visível (nunca `outline: none` sem alternativa)
       — estrutura do skeleton reflete o layout real do conteúdo
 - [ ] Imagens com `loading="lazy"` + placeholder de mesma proporção
 - [ ] Rotas com lazy loading (code splitting por página)
@@ -188,9 +196,12 @@ as implementações reais chegam depois.
 - [ ] **Todo botão de ação** usa `LoadingButton` com spinner + texto no
       gerúndio — nunca `<Button disabled>` sem feedback visual
 - [ ] Toast usado após toda operação assíncrona (salvar, excluir, erro de API)
-- [ ] Testes E2E escritos e rodando localmente — fixtures usam
-      `t.Cleanup` (Go) ou `afterEach`/fixture extend (Playwright)
-      para limpeza interna (ver `CLAUDE.md` "Regras de testes")
+- [ ] Testes unitários de domínio (use cases, value objects) escritos ANTES
+      do código (TDD) — sempre, sem exceção
+- [ ] Smoke de integração: health endpoint + banco conecta
+- [ ] Fixtures com `t.Cleanup` (Go) ou `afterEach`/fixture extend (Playwright)
+- [ ] Testes E2E Playwright: **apenas se** `spec.md` marcar "E2E antecipado: sim"
+      (decisão do `analista-requisitos` ou `arquiteto`)
 - [ ] Ports de auth (`AuthorizationChecker`) e auditoria (`AuditLogger`)
       já referenciados no código, com implementação NoOp
 - [ ] OpenAPI atualizado
