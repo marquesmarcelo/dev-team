@@ -7,34 +7,34 @@
 ## Backend
 
 - [ ] **T1** — Criar entidade `<Nome>` em `/domain` com invariantes de `<regra>`
-  - Subagent sugerido: `arquiteto` (revisão) → `dev-backend` (implementação)
+  - Subagent sugerido: `arquiteto` (revisão) → `dev-fullstack` (implementação)
 - [ ] **T2** — Criar interface `<NomeRepository>` em `/port`
-  - Subagent sugerido: `dev-backend`
+  - Subagent sugerido: `dev-fullstack`
 - [ ] **T3** — Implementar use case `<NomeUseCase>` com testes (TDD, mock do port)
-  - Subagent sugerido: `dev-backend`
+  - Subagent sugerido: `dev-fullstack`
   - Critério de aceite coberto: Cenário "<nome do cenário em spec.md>"
 - [ ] **T4** — Implementar adapter de persistência (camada `adapter`,
   biblioteca de acesso a dados definida na skill da stack configurada) +
   migration com `up`/`down` testados
-  - Subagent sugerido: `dba` (migration + revisão de query) → `dev-backend` (adapter)
+  - Subagent sugerido: `dba` (migration + revisão de query) → `dev-fullstack` (adapter)
   - Confirmar: PK é UUIDv7, nenhum ID sequencial introduzido
 - [ ] **T5** — Implementar handler/controller de entrada (camada `adapter`)
-  - Subagent sugerido: `dev-backend`
+  - Subagent sugerido: `dev-fullstack`
 
 ## UX (apenas se a feature tiver interface visual relevante)
 
 - [ ] **T5b** — Desenhar fluxo de tela(s), estados (vazio/carregando/erro)
   e hierarquia visual
   - Subagent sugerido: `ux-designer`
-  - Saída: `specs/<feature>/ux.md`, consumido pelo `dev-frontend`
+  - Saída: `specs/<feature>/ux.md`, consumido pelo `dev-fullstack`
 
 ## Frontend
 
 - [ ] **T6** — Criar hook/camada de dados para consumir a API
-  - Subagent sugerido: `dev-frontend`
+  - Subagent sugerido: `dev-fullstack`
 - [ ] **T7** — Criar componente(s) de tela usando a biblioteca de
   componentes configurada, seguindo ux.md (se existir)
-  - Subagent sugerido: `dev-frontend`
+  - Subagent sugerido: `dev-fullstack`
 
 ## Transversal
 
@@ -44,7 +44,7 @@
   - Subagent sugerido: `code-reviewer`
 - [ ] **T9** — Construir testes E2E a partir dos exemplos concretos de
   spec.md
-  - Subagent sugerido: `construtor-testes-e2e`
+  - Subagent sugerido: `dev-fullstack`
 - [ ] **T9b** — Validar (de forma independente) os testes E2E e os testes
   de unidade, gerar evidence.md com resultado executado de fato
   - Subagent sugerido: `qa-tester`
@@ -54,13 +54,13 @@
   - Subagent sugerido: `devops`
 - [ ] **T11** (condicional, se design.md indicar) — Implementar cache
   cache-aside com TTL e invalidação via Domain Event
-  - Subagent sugerido: `dev-backend`
+  - Subagent sugerido: `dev-fullstack`
 - [ ] **T12** (condicional, se design.md indicar) — Implementar checagem de
   `Idempotency-Key` no handler
-  - Subagent sugerido: `dev-backend`
+  - Subagent sugerido: `dev-fullstack`
 - [ ] **T13** (condicional, se design.md indicar chamada externa) —
   Envolver chamada externa com circuit breaker no adapter
-  - Subagent sugerido: `dev-backend`
+  - Subagent sugerido: `dev-fullstack`
 - [ ] **T14** (condicional, se houver oportunidade de IA aprovada em
   oportunidades-ia.md) — Implementar interface `LLMClient` + adapter do
   provedor configurado, com saída estruturada validada e fallback

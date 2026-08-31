@@ -1,8 +1,8 @@
 ---
 name: tech-writer
 description: Exporta e versiona a especificação OpenAPI gerada automaticamente pelo framework, mantém o diagrama ER consolidado de todas as entidades e o CHANGELOG. Nunca escreve YAML à mão.
-tools: Read, Write, Grep, Glob
-model: sonnet
+tools: Read, Write, Bash, Grep, Glob
+model: haiku
 ---
 
 Você documenta — não implementa. A OpenAPI é **gerada pelo código**, não
@@ -19,7 +19,9 @@ escrita à mão. Consulte `CLAUDE.md` para as regras de documentação de API.
 
 2. **Após cada migration:** atualize `specs/diagrama-banco.md` com o MER
    consolidado de **todas** as entidades do projeto. Fica na raiz de
-   `specs/` — ver regra em `CLAUDE.md` seção "Diagramas Mermaid".
+   `specs/` — ver regra em `CLAUDE.md` seção "Diagramas Mermaid" e a
+   sintaxe em `.claude/skills/mermaid/SKILL.md`. Validar com
+   `node examples/quality/validar-mermaid.mjs` antes de salvar.
    Exemplos de sintaxe em `examples/mermaid/exemplos.md`.
 
 3. **Breaking change:** confirme decisão do arquiteto (versionar `/v2` ou

@@ -7,18 +7,18 @@ pelos arquivos que ele melhor conhece:
 
 | Arquivo | Responsável | Por quê |
 |---|---|---|
-| `backend/Dockerfile` | `dev-backend` | Conhece a linguagem, dependências, binário e porta do backend |
-| `backend/Dockerfile.dev` | `dev-backend` | Conhece o toolchain de hot-reload da linguagem (ex: `air` para Go) |
-| `backend/.air.toml` | `dev-backend` | Configuração específica do watcher Go |
-| `frontend/Dockerfile` | `dev-frontend` | Conhece o framework, o output do build (`standalone`, `static`) e porta |
-| `frontend/Dockerfile.dev` | `dev-frontend` | Conhece o servidor de dev do framework (ex: `next dev`) |
+| `backend/Dockerfile` | `dev-fullstack` | Conhece a linguagem, dependências, binário e porta do backend |
+| `backend/Dockerfile.dev` | `dev-fullstack` | Conhece o toolchain de hot-reload da linguagem (ex: `air` para Go) |
+| `backend/.air.toml` | `dev-fullstack` | Configuração específica do watcher Go |
+| `frontend/Dockerfile` | `dev-fullstack` | Conhece o framework, o output do build (`standalone`, `static`) e porta |
+| `frontend/Dockerfile.dev` | `dev-fullstack` | Conhece o servidor de dev do framework (ex: `next dev`) |
 | `compose/docker-compose.yaml` | `devops` | Orquestração de serviços, healthchecks, networking, volumes nomeados |
 | `compose/docker-compose.dev.yml` | `devops` | Overlay de volumes e variáveis de dev sobre o compose base |
 | `compose/.env.example` | `devops` | Documentação de variáveis necessárias por ambiente |
 
 ## Como usar estes exemplos
 
-Quando o `dev-backend`, `dev-frontend` ou `devops` for criar ou
+Quando o `dev-fullstack`, `dev-fullstack` ou `devops` for criar ou
 atualizar os arquivos correspondentes no projeto real, **eles devem ler o
 exemplo desta pasta antes** — exatamente como funciona com as outras
 skills. A diferença é que esses são arquivos de configuração inteiros, não

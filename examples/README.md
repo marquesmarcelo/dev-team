@@ -30,8 +30,8 @@ automaticamente pelos subagents durante a execução (diferente de
   (decisão e arquitetura hexagonal). Referência para `arquiteto`, `dba`
   e `tech-writer`.
   organizados por quem é responsável por eles:
-  - `backend/` → `dev-backend` (Dockerfile prod/dev + .air.toml)
-  - `frontend/` → `dev-frontend` (Dockerfile prod/dev)
+  - `backend/` → `dev-fullstack` (Dockerfile prod/dev + .air.toml)
+  - `frontend/` → `dev-fullstack` (Dockerfile prod/dev)
   - `compose/` → `devops` (docker-compose.yaml, docker-compose.dev.yml, .env.example)
 
 ## Quando usar isso

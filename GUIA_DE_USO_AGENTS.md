@@ -8,7 +8,7 @@
 
 ## O que é este template
 
-Um conjunto de **15 agentes e 11 skills** para Claude Code que transforma
+Um conjunto de **18 agentes e 18 skills** para Claude Code que transforma
 o desenvolvimento em um fluxo estruturado. Você atua como dono do produto;
 o time de agentes cuida do resto.
 
@@ -36,6 +36,18 @@ observações de Andrej Karpathy sobre armadilhas de LLMs em código):
 | **Mudanças cirúrgicas** | Refatorações não pedidas, alterações colaterais, limpeza indevida |
 | **Execução orientada a objetivos** | Critérios vagos que exigem clarificação constante |
 
+Duas regras universais que os agentes aplicam sem você precisar pedir:
+
+- **Dual write → Transactional Outbox.** Todo use case que grava no banco e
+  também publica evento, escreve em cache ou chama API externa que altera
+  estado é um dual write. O `arquiteto` marca isso no `design.md` e a
+  solução é sempre Outbox — o `code-reviewer` bloqueia se faltar.
+- **Conteúdo alinhado à esquerda, ocupando o espaço útil.** A área de
+  conteúdo começa junto ao menu lateral e vai até a margem direita.
+  Componentes consomem a largura disponível — tabela em largura total,
+  formulário em grid de 2-3 colunas no desktop. Nada de conteúdo
+  centralizado em coluna estreita no meio da tela.
+
 **O princípio mais impactante para o fluxo do projeto é o Goal-Driven:**
 em vez de dizer "implemente X", os agentes transformam cada task em um
 critério verificável ("o teste Y deve passar com os dados Z") e iteram
@@ -54,67 +66,68 @@ de sucesso e deixa o agente iterar até concluir sem interrupções.
 
 ```mermaid
 flowchart TD
-    START([Início]) --> ANALISTA
+    START(["Início"]) --> ANALISTA
 
     subgraph ESPECIFICACAO["📋 Especificação"]
-        ANALISTA[analista-requisitos\nVisão + spec.md + wireframe]
-        UX[ux-designer\nux.md — filtros, campos,\nautocomplete, acessibilidade]
-        AI_CONS[ai-consultor\noportunidades-ia.md\nopcional]
-        ARQUITETO[arquiteto\ndesign.md + tasks.md\ngrupos de paralelismo]
+        ANALISTA["analista-requisitos<br/>Visão + spec.md + wireframe"]
+        UX["ux-designer<br/>ux.md — filtros, campos,<br/>autocomplete, acessibilidade"]
+        AI_CONS["ai-consultor<br/>oportunidades-ia.md<br/>opcional"]
+        ARQUITETO["arquiteto<br/>design.md + tasks.md<br/>grupos de paralelismo"]
     end
 
     subgraph IMPLEMENTACAO["⚙️ Implementação"]
-        FS_A[dev-fullstack\nfeature A]
-        FS_B[dev-fullstack\nfeature B]
-        FS_N[dev-fullstack\nfeature N]
+        FS_A["dev-fullstack<br/>feature A"]
+        FS_B["dev-fullstack<br/>feature B"]
+        FS_N["dev-fullstack<br/>feature N"]
     end
 
     subgraph VALIDACAO_MANUAL["✋ Validação manual (obrigatória)"]
-        TESTE[Usuário testa\ndocker compose up]
-        APROVA{Aprovado?}
+        TESTE["Usuário testa<br/>docker compose up"]
+        APROVA{"Aprovado?"}
     end
 
     subgraph REVISAO["🔍 Revisão"]
-        SEC[security-reviewer\nOWASP Top 10]
-        CODE[code-reviewer\nqualidade + arquitetura]
-        QA[qa-tester\nexecuta testes\nevidence.md]
+        SEC["security-reviewer<br/>OWASP Top 10"]
+        CODE["code-reviewer<br/>qualidade + arquitetura"]
+        QA["qa-tester<br/>executa testes<br/>evidence.md"]
     end
 
     subgraph FINALIZACAO["📦 Finalização"]
-        TW[tech-writer\nopenapi.yaml\ndiagrama-banco.md]
-        DC[dev-docker-compose\nDockerfiles + Compose]
-    K8S[dev-kubernetes\nK8s + ArgoCD + GitLab CI\nopcional]
+        TW["tech-writer<br/>openapi.yaml<br/>diagrama-banco.md"]
+        DC["dev-docker-compose<br/>Dockerfiles + Compose"]
+        K8S["dev-kubernetes<br/>K8s + ArgoCD + GitLab CI<br/>opcional"]
     end
 
-    ANALISTA -->|PARA - valide| USUARIO_V1{Aprovado?}
-    USUARIO_V1 -->|Sim| UX
-    USUARIO_V1 -->|Ajustar| ANALISTA
+    ANALISTA -->|"PARA - valide"| USUARIO_V1{"Aprovado?"}
+    USUARIO_V1 -->|"Sim"| UX
+    USUARIO_V1 -->|"Ajustar"| ANALISTA
 
-    UX -->|PARA - valide| USUARIO_V2{Aprovado?}
-    USUARIO_V2 -->|Sim| AI_CONS
-    USUARIO_V2 -->|Ajustar| UX
+    UX -->|"PARA - valide"| USUARIO_V2{"Aprovado?"}
+    USUARIO_V2 -->|"Sim"| AI_CONS
+    USUARIO_V2 -->|"Ajustar"| UX
     AI_CONS --> ARQUITETO
 
-    ARQUITETO -->|PARA - valide\ntasks.md + grupos| USUARIO_V3{Aprovado?}
-    USUARIO_V3 -->|Ajustar| ARQUITETO
-    USUARIO_V3 -->|Sim - dispara\nem paralelo| FS_A & FS_B & FS_N
+    ARQUITETO -->|"PARA - valide<br/>tasks.md + grupos"| USUARIO_V3{"Aprovado?"}
+    USUARIO_V3 -->|"Ajustar"| ARQUITETO
+    USUARIO_V3 -->|"Sim - dispara<br/>em paralelo"| FS_A & FS_B & FS_N
 
     FS_A --> TESTE
     FS_B --> TESTE
     FS_N --> TESTE
 
     TESTE --> APROVA
-    APROVA -->|Não — corrigir| FS_A
-    APROVA -->|Sim| SEC & CODE
+    APROVA -->|"Não — corrigir"| FS_A
+    APROVA -->|"Sim"| SEC & CODE
 
     SEC --> QA
     CODE --> QA
 
-    QA -->|PARA - valide\nevidence.md| USUARIO_V4{Aprovado?}
-    USUARIO_V4 -->|Não| FS_A
-    USUARIO_V4 -->|Sim| TW
-    TW --> DEVOPS
-    DEVOPS --> FIM([Produção 🚀])
+    QA -->|"PARA - valide<br/>evidence.md"| USUARIO_V4{"Aprovado?"}
+    USUARIO_V4 -->|"Não"| FS_A
+    USUARIO_V4 -->|"Sim"| TW
+    TW --> DC
+    DC --> K8S
+    K8S --> FIM(["Produção 🚀"])
 
     style ESPECIFICACAO fill:#e8f4f8,stroke:#2980b9
     style IMPLEMENTACAO fill:#e8f8e8,stroke:#27ae60
@@ -402,7 +415,7 @@ Ver `CLAUDE.md` seção "Hierarquia de autoridade" para o protocolo completo.
 
 ---
 
-## Referência: os 15 agentes
+## Referência: os 18 agentes
 
 ### Descoberta e especificação
 
@@ -435,15 +448,22 @@ Ver `CLAUDE.md` seção "Hierarquia de autoridade" para o protocolo completo.
 | `qa-tester` | Executa os testes escritos pelo dev-fullstack, reporta resultado | `evidence.md` completo; chama dev-fullstack para corrigir falhas |
 | `auditor-projeto` | Auditoria de conformidade | Verifica projeto existente contra padrões atuais — gera relatório com achados por severidade e plano de atualização |
 | `load-tester` | Teste de carga k6 (quando design.md indicar) | Relatório com thresholds objetivos |
-| `tech-writer` | Exporta OpenAPI e mantém diagrama ER consolidado | `docs/openapi.yaml` + `docs/diagrama-banco.md` + `CHANGELOG.md` |
+| `tech-writer` | Exporta OpenAPI e mantém diagrama ER consolidado | `docs/openapi.yaml` + `specs/diagrama-banco.md` + `CHANGELOG.md` |
 
 ---
 
-## Referência: as 11 skills
+## Referência: as 18 skills
 
 Skills são lidas pelos agentes antes de implementar. Contêm as convenções
 específicas de cada tecnologia — nunca as regras universais (essas ficam
 em `CLAUDE.md`).
+
+**Skills grandes usam divulgação progressiva.** As duas skills de frontend
+têm `SKILL.md` curto (o índice e as regras que valem sempre) e uma pasta
+`reference/` com o detalhe por área — AppShell, grid, formulários, estados,
+build. O agente lê o índice e carrega só a referência da área em que vai
+trabalhar. Antes, a skill inteira ocupava cerca de 25 mil tokens de
+contexto por sessão; hoje ocupa uma fração disso.
 
 | Skill | Tecnologia | O que cobre |
 |---|---|---|
@@ -461,6 +481,7 @@ em `CLAUDE.md`).
 | `load-testing-k6` | k6 | Scripts com thresholds, execução via Docker, envio para Prometheus |
 | `mcp-server` | TypeScript / Python | Servidor MCP: estrutura de projeto, SDK, transporte STDIO/SSE, autenticação, Dockerfiles |
 | `dataviz` | Recharts (Next.js), ECharts (Angular), Chart.js (universal) | Gráficos, dashboards e visualizações de dados. Protocolo de decisão (qual gráfico), princípios Tufte + NYT Graphics, anti-padrões, acessibilidade |
+| `mermaid` | Mermaid.js | Sintaxe segura de diagrama (aspas obrigatórias em rótulo, `<br/>` para quebra, escape por entidade, palavras reservadas) + validador que roda o parser oficial antes de salvar |
 | `systematic-debugging` | Qualquer stack | Debug em 4 fases: reprodução → causa raiz → hipótese → correção. Baseado no Superpowers (Jesse Vincent) |
 | `geo` | PostGIS + Leaflet + GeoServer | Dados geográficos: tipos PostGIS, SIRGAS 2000 (EPSG:4674), API GeoJSON, Leaflet, GeoServer WMS/WFS opcional, fontes IBGE/CONCAR. Ativado via `Geo: sim` em `project.config.md` |
 

@@ -36,7 +36,7 @@
 
 ---
 
-> O que mudaria nos subagents: NADA. `dev-backend.md` continua igual —
+> O que mudaria nos subagents: NADA. `dev-fullstack.md` continua igual —
 > ele só leria "Node.js" em vez de "Go" neste arquivo e carregaria a skill
 > `backend-node-express` em vez de `backend-go`. Essa é a prova de que a
 > separação papel/tecnologia está funcionando como deveria.

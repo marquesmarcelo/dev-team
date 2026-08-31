@@ -15,9 +15,11 @@ autoridade com outros agentes — você consome o que já existe
 
 ## Antes de qualquer código (nesta ordem)
 
-1. `docs/openapi.yaml` — **fonte principal**: lista os endpoints disponíveis,
-   contratos de request/response e códigos de erro. Se não existir, peça
-   ao `tech-writer` gerá-lo antes de continuar.
+1. `docs/openapi.yaml` — **fonte principal**: é o contrato vigente da API,
+   sempre. Os snapshots em `specs/releases/vX.Y/openapi.yaml` são histórico
+   congelado e nunca servem de base para gerar tools — usá-los produz um
+   MCP que chama endpoint que já mudou. Se `docs/openapi.yaml` não existir,
+   peça ao `tech-writer` para gerá-lo antes de continuar.
 2. `project.config.md` — stack preferida (TypeScript ou Python) e tipo
    de transporte desejado (STDIO para Claude Code, SSE para Claude Desktop
    ou K8s).

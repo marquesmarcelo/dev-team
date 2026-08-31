@@ -1,6 +1,6 @@
 # Exemplos de Value Objects em Go
 
-> Referência para `dev-backend` e `arquiteto`. Estes padrões aplicam-se a
+> Referência para `dev-fullstack` e `arquiteto`. Estes padrões aplicam-se a
 > qualquer atributo com validação, formato próprio, ou semântica de domínio.
 
 ## Estrutura de pastas

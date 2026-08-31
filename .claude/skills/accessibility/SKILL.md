@@ -1,6 +1,6 @@
 ---
 name: accessibility
-description: Use ao projetar telas (ux-designer), implementar componentes (dev-frontend), ou revisar código de UI (code-reviewer). Define o padrão de acessibilidade adotado pelo projeto (WCAG 2.2 AA) com regras práticas e verificáveis — não teoria abstrata.
+description: Use ao projetar telas (ux-designer), implementar componentes (dev-fullstack), ou revisar código de UI (code-reviewer). Define o padrão de acessibilidade adotado pelo projeto (WCAG 2.2 AA) com regras práticas e verificáveis — não teoria abstrata.
 ---
 
 # Acessibilidade: WCAG 2.2 Level AA
@@ -120,7 +120,8 @@ Para projetos do setor público brasileiro, vale adicionalmente o **eMAG** (Mode
 
 ## Ferramentas de verificação (integrar ao fluxo de desenvolvimento)
 
-- **axe DevTools** (extensão Chrome gratuita) — verifica automaticamente os critérios verificáveis; rodar antes de qualquer PR de UI.
+- **`@axe-core/playwright` no pipeline (obrigatório)** — mesma engine do axe DevTools, rodando como teste automatizado em toda tela. Ver `.claude/skills/e2e-playwright/SKILL.md`, seção "Acessibilidade automatizada". É o que garante que a verificação acontece; as extensões abaixo são para investigar um achado.
+- **axe DevTools** (extensão Chrome gratuita) — usar para investigar e corrigir uma violação já detectada pelo pipeline.
 - **WAVE** (extensão Chrome) — visualização mais didática dos erros.
 - **Chrome DevTools** → Painel Lighthouse → aba Accessibility — integra ao CI com threshold mínimo de 90.
 - **Verificação manual obrigatória** (o que as ferramentas automáticas não pegam):

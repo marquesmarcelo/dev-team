@@ -23,7 +23,14 @@ docker compose run --rm backend <health-check>
 
 # E2E antecipado — APENAS se spec.md marcar "E2E antecipado: sim"
 docker compose run --rm playwright npx playwright test e2e/<feature>/
+
+# Acessibilidade — SEMPRE que a feature tiver tela (rápido, roda em todo PR)
+docker compose run --rm playwright npx playwright test e2e/acessibilidade/
 ```
+
+Violação de acessibilidade entra no `evidence.md` com o id da regra axe e a
+tela afetada. Violação de contraste ou campo sem label é bloqueio de
+entrega, não observação.
 
 ### Modo release — fase de lançamento de versão
 
@@ -41,6 +48,26 @@ npx playwright show-report
 Gerar `specs/releases/vX.Y/evidence-e2e.md` com resultado completo.
 
 ---
+
+## Coleta de cobertura por stack
+
+O Quality Gate do SonarQube exige cobertura ≥ 80%. O relatório precisa ser
+gerado no formato que o Sonar entende:
+
+| Stack | Comando | Arquivo gerado |
+|---|---|---|
+| Go | `go test ./... -coverprofile=coverage.out` | `coverage.out` |
+| Python | `pytest --cov=app --cov-report=xml` | `coverage.xml` |
+| Java | `./mvnw test jacoco:report` | `target/site/jacoco/jacoco.xml` |
+| PHP | `./vendor/bin/phpunit --coverage-clover coverage.xml` | `coverage.xml` |
+| Node/TS | `npx vitest run --coverage` (provider `v8`, reporter `lcov`) | `coverage/lcov.info` |
+
+O caminho do arquivo é declarado no `sonar-project.properties`
+(`sonar.go.coverage.reportPaths`, `sonar.python.coverage.reportPaths`,
+`sonar.javascript.lcov.reportPaths`, conforme a stack). Se o
+`sonar-project.properties` não apontar para o relatório, o Sonar reporta 0%
+e o Quality Gate falha sem motivo real — verifique isso antes de relatar
+cobertura baixa como achado.
 
 ## Avaliação de qualidade antes de reportar
 

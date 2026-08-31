@@ -190,15 +190,15 @@ flowchart LR
   end
 
   subgraph Aplicação
-    CMD[CriarProcesso\nUseCase]
-    QRY[ListarProcessos\nUseCase]
+    CMD["CriarProcesso<br/>UseCase"]
+    QRY["ListarProcessos<br/>UseCase"]
   end
 
   subgraph Ports
-    REPO[ProcessoRepository\ninterface]
-    CACHE[Cache\ninterface]
-    PUB[EventPublisher\ninterface]
-    ABAC[AuthorizationChecker\ninterface]
+    REPO["ProcessoRepository<br/>interface"]
+    CACHE["Cache<br/>interface"]
+    PUB["EventPublisher<br/>interface"]
+    ABAC["AuthorizationChecker<br/>interface"]
   end
 
   subgraph Adapters

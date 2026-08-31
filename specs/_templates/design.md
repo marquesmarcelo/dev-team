@@ -10,7 +10,8 @@
 > - `flowchart` — fluxo de decisão ou arquitetura de componentes
 
 ```mermaid
-<diagrama aqui — gerado pelo arquiteto>
+flowchart TD
+    A["substituir por diagrama real — ver .claude/skills/mermaid/SKILL.md"]
 ```
 
 ## Impacto na arquitetura hexagonal
@@ -90,12 +91,35 @@
 - [ ] pgvector — caso de uso: <ex: busca semântica de quê>
 - [ ] PostGIS — caso de uso: <ex: geolocalização de quê>
 
+### Concorrência (avaliação obrigatória em toda entidade editável)
+- [ ] Não se aplica — entidade escrita por um único processo. Motivo: <...>
+- [ ] Lock otimista com `versao`
+  - `versao` obrigatório no request de `PUT`/`PATCH` e presente no `GET`
+  - Conflito responde **409** com mensagem própria na tela
+  - Entidades cobertas: <lista>
+
+### Dual write (avaliação obrigatória em toda feature)
+
+O use case grava em mais de um lugar durável na mesma operação de negócio?
+(banco + fila, banco + cache, banco + API externa, banco + índice de busca)
+
+- [ ] Não — grava só no banco, dentro de uma transação
+- [ ] Sim — destinos: <banco + qual outro>
+  - Saídas de escape avaliadas e descartadas — motivo:
+    - Eliminar a segunda escrita: <por que não serve>
+    - Derivar por reconciliação: <por que não serve>
+    - Tolerar a perda do evento: <por que não serve>
+  - **Transactional Outbox: obrigatório** (ver `CLAUDE.md` "Dual Write problem")
+    - Tipos de evento gravados na `outbox`: <lista>
+    - Relay: <goroutine no backend | worker separado | cronjob>
+    - Consumidor idempotente por: <chave de deduplicação>
+
 ### Mensageria (avaliação obrigatória em toda feature)
 - [ ] REST síncrono suficiente — motivo: <...>
 - [ ] Mensageria adotada — broker: <RabbitMQ/Kafka> — motivo: <...>
-  - Outbox Pattern: [ ] incluído como requisito
+  - Outbox Pattern: obrigatório (ver seção "Dual write" acima)
   - Fan-out para: <quais consumidores>
-  - Tarefa para `devops` configurar broker: [ ] incluída em tasks.md
+  - Tarefa para `dev-docker-compose` configurar broker: [ ] incluída em tasks.md
 
 ### Stateless / multi-container
 - [ ] Sem estado local — sem impacto adicional

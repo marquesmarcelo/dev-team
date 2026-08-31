@@ -39,7 +39,7 @@ Cenário: <nome do cenário de erro>
 > Obrigatório, não opcional. Cada cenário acima precisa de pelo menos um
 > exemplo com dado real (ou o mais próximo de real possível) — não dado
 > fictício genérico como "Teste 123". Esses exemplos alimentam diretamente
-> a construção dos testes E2E pelo `construtor-testes-e2e` e a validação
+> a construção dos testes E2E pelo `dev-fullstack` e a validação
 > pelo `qa-tester`. Se o dono do produto não tiver dado real à mão, peça
 > um exemplo plausível e específico do domínio antes de prosseguir.
 

@@ -14,8 +14,8 @@
   - Python + FastAPI → `backend-python-fastapi`
   - Java + Spring Boot → `backend-java-springboot`
   - PHP + Laravel → `backend-php-laravel`
-- **Subagent correspondente:** `dev-backend` (genérico) ou especializado
-  (`dev-backend-python` | `dev-backend-java` | `dev-backend-php`)
+- **Subagent correspondente:** `dev-fullstack` (único agente de implementação,
+  agnóstico de stack — carrega a skill correspondente antes de codificar)
 
 ## Frontend
 - **Framework:** <ex: Next.js | Angular>
@@ -24,7 +24,7 @@
 - **Skill correspondente:** `.claude/skills/frontend-<nome>/SKILL.md`
   - Next.js + shadcn/ui → `frontend-nextjs-shadcn`
   - Angular → `frontend-angular`
-- **Subagent correspondente:** `dev-frontend` (genérico) ou `dev-frontend-angular`
+- **Subagent correspondente:** `dev-fullstack`
 
 ## Serviços opcionais (adicionar ao docker-compose se o projeto precisar)
 

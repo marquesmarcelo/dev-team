@@ -33,7 +33,11 @@ nem entre em loop. Ver `CLAUDE.md` seção "Hierarquia de autoridade".
    Se `Geo: sim` → carregar também `.claude/skills/geo/SKILL.md`
 2. `.claude/skills/backend-<stack>/SKILL.md` — convenções do backend
 3. `.claude/skills/frontend-<stack>/SKILL.md` — convenções do frontend
-   (omita se a feature não tiver UI)
+   (omita se a feature não tiver UI). **Leia o SKILL.md inteiro e só os
+   arquivos de `reference/` correspondentes ao que você vai construir** —
+   a tabela no topo do SKILL.md diz qual é qual. Carregar todos os
+   `reference/` de uma vez consome o contexto que você vai precisar para o
+   design, a spec e o próprio código.
 4. `specs/<feature>/tasks.md` — o que implementar nesta feature
 5. `specs/<feature>/design.md` — decisões do arquiteto: entidades,
    Value Objects, contrato de API, CQRS, cache, eventos, autocomplete
@@ -124,11 +128,12 @@ Componente de feature implementa exatamente o que `ux.md` define:
 - 4 estados de grid: loading (skeleton), error (+retry), empty, data
 - Botão e formulário desabilitados durante operação
 
-### 8. Testes E2E
+### 8. Testes E2E — condicional
 
-Escreva os testes Playwright para os cenários de `spec.md` — você é
-responsável por eles, não o `construtor-testes-e2e`. Use a skill
-`e2e-playwright/SKILL.md`. Cubra:
+Só nesta fase se `spec.md` marcar **"E2E antecipado: sim"**. Caso contrário,
+os testes E2E são escritos na Fase Release, quando o arquiteto acionar.
+
+Quando escrever, use a skill `e2e-playwright/SKILL.md`. Cubra:
 - Fluxo principal com dados reais de `spec.md`
 - Fluxos de erro
 - Comportamentos assíncronos: botão bloqueado, skeleton, empty vs loading
@@ -167,27 +172,37 @@ as implementações reais chegam depois.
 - [ ] Testes unitários passam (escritos antes do código)
 - [ ] Cenários de `spec.md` cobertos com dados reais dos exemplos
 - [ ] Handler segue contrato exato de `design.md`
+- [ ] Concorrência otimista: `UPDATE ... AND versao = $n`, erro de domínio
+      traduzido para **409**, tela oferece recarregar os dados atuais
 - [ ] `/autocomplete` implementado se `ux.md` indicar
 - [ ] Componente implementa `ux.md` (se houver UI)
 - [ ] Formulários com dirty state: confirmar antes de fechar modal, cancelar
       ou navegar para outra rota quando há dados não salvos
 - [ ] `beforeunload` configurado em páginas de formulário com dados sujos
-      tabela com colunas essenciais em mobile
-- [ ] Modais centralizados + tamanho proporcional ao conteúdo + `max-h-[90vh]`
+- [ ] Área de conteúdo alinhada à esquerda, `w-full` com padding — sem
+      `mx-auto`+`max-w-*` no wrapper de página (ver `CLAUDE.md` "Área de conteúdo")
+- [ ] Componentes consomem o espaço útil: tabela `w-full`, formulário em
+      `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, filtros lado a lado
+- [ ] Layout responsivo: tabela reduzida às colunas essenciais em mobile,
+      formulário em coluna única abaixo de `md`
+- [ ] Tela verificada em 360px, 768px e 1440px — sem scroll horizontal e
+      sem faixa vazia à direita do conteúdo
+- [ ] Modais centralizados + tamanho proporcional ao conteúdo + `max-h-[85vh]`
       com scroll interno + focus trap (`@radix-ui/react-dialog` ou `cdkTrapFocus`)
 - [ ] `Tab` navega entre todos os campos em ordem lógica; `Esc` fecha modais
 - [ ] Atalhos `Ctrl+N` (novo), `Ctrl+S` (salvar), `Ctrl+F` (pesquisa) implementados
 - [ ] `focus-visible` com outline visível (nunca `outline: none` sem alternativa)
-      — estrutura do skeleton reflete o layout real do conteúdo
+- [ ] Skeleton com estrutura que reflete o layout real do conteúdo
 - [ ] Imagens com `loading="lazy"` + placeholder de mesma proporção
 - [ ] Rotas com lazy loading (code splitting por página)
 - [ ] Componentes pesados (mapa, editor rico) com import dinâmico
 - [ ] Modal, drawer, dropdown e collapse com animação de entrada/saída
 - [ ] `prefers-reduced-motion` no globals desabilita animações decorativas
 - [ ] Se projeto JS/TS (Next.js, Angular, NestJS): `biome.json`, `knip.config.ts`,
-      `.dependency-cruiser.js` e `commitlint.config.js` presentes (copiar de `examples/quality/`)
-      `git clone` do quickstart oficial (ver skill `frontend-angular-dsgov`)
-      e ajustar apenas o menu lateral para os itens do projeto
+      `.dependency-cruiser.js` e `commitlint.config.js` presentes
+      (copiar de `examples/quality/`)
+- [ ] Se Angular + DSGOV: projeto iniciado com `git clone` do quickstart oficial
+      (ver skill `frontend-angular-dsgov`), ajustando apenas os itens do menu lateral
 - [ ] Se primeira feature com UI: AppShell com **indicador de navegação**
       (NProgress) e **sistema de toast** (`notify.sucesso/erro/aviso/info`)
       implementados e registrados globalmente; **LoadingButton** em `shared/ui/`

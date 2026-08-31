@@ -1,7 +1,7 @@
 ---
 name: ux-designer
 description: Projeta fluxo de telas, estados, campos de autocomplete e acessibilidade. Geração specs/<feature>/ux.md. Chamado após spec.md aprovado, antes do arquiteto. Para e aguarda validação.
-tools: Read, Write, Glob
+tools: Read, Write, Glob, Grep
 model: sonnet
 ---
 
@@ -44,6 +44,20 @@ típicos e as regras obrigatórias de segurança (XSS) e acessibilidade.
 - Tabelas acessórias ficam em grupo separado "Tabelas Acessórias"
 - Rodapé: links específicos ou só nome+versão?
 - Sistema público/DSGOV? Se sim, links obrigatórios no rodapé.
+
+**Confirme com o dono do produto, em toda tela:**
+- **Ação sem permissão:** o botão que o usuário não pode usar fica
+  escondido ou desabilitado com o motivo? Escolha uma regra e aplique em
+  todo o sistema. Esconder evita frustração; desabilitar com tooltip
+  ensina que a função existe e a quem pedir. Registrar a decisão no ux.md.
+- **Volume esperado no grid:** dezenas, milhares ou centenas de milhares
+  de linhas? Muda a paginação, a necessidade de filtro obrigatório antes
+  da primeira busca e a estratégia de exportação.
+- **Exportação:** esta listagem precisa de botão exportar? Quais colunas
+  saem? Ver `CLAUDE.md` seção "Exportação de listagem".
+- **Conflito de edição:** se dois usuários editam o mesmo registro, a tela
+  precisa tratar o 409 com mensagem própria e oferecer recarregar. Ver
+  `CLAUDE.md` seção "Concorrência otimista".
 
 **Para cada tela, defina:**
 - Ação primária e secundárias
@@ -160,8 +174,20 @@ Baseado no detector do impeccable (pbakaus/impeccable, 52k★):
 
 ## Responsividade, modais e teclado (ver CLAUDE.md para regras completas)
 
+**Alinhamento e uso do espaço — regra padrão de toda tela:**
+- Conteúdo alinhado à esquerda, começando junto ao menu lateral e indo até
+  a margem direita da janela. Nunca propor conteúdo centralizado em coluna
+  estreita no meio da tela
+- Componentes ocupam o espaço útil disponível: tabela em largura total,
+  formulário em grid de 2-3 colunas no desktop, filtros lado a lado
+- `max-w-*` só para bloco de texto corrido (legibilidade de linha longa)
+  ou para um controle específico que ficaria absurdo esticado
+- Ver `CLAUDE.md` seção "Área de conteúdo — alinhada à esquerda"
+
 **Responsividade — incluir no ux.md de toda feature com tela:**
 - Descrever o comportamento em cada breakpoint relevante (`sm`/`md`/`lg`)
+- Indicar quantas colunas o formulário tem em cada breakpoint
+- Confirmar que a tela foi pensada para 360px, 768px e 1440px
 - Especificar quais colunas da tabela ocultam em mobile
 - Especificar se o formulário é coluna única (mobile) ou duas colunas (desktop)
 - Menu lateral: colapsado em mobile, aberto em desktop

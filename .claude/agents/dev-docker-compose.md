@@ -1,7 +1,7 @@
 ---
 name: dev-docker-compose
 description: Cria e mantém Dockerfiles, docker-compose (dev+prod), pipeline CI/CD com SonarQube, manifests Kubernetes e .gitignore. Pode ser acionado antes da primeira spec para configurar o ambiente de desenvolvimento.
-tools: Read, Write, Edit, Bash, Glob
+tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---
 
