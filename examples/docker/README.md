@@ -12,13 +12,13 @@ pelos arquivos que ele melhor conhece:
 | `backend/.air.toml` | `dev-fullstack` | Configuração específica do watcher Go |
 | `frontend/Dockerfile` | `dev-fullstack` | Conhece o framework, o output do build (`standalone`, `static`) e porta |
 | `frontend/Dockerfile.dev` | `dev-fullstack` | Conhece o servidor de dev do framework (ex: `next dev`) |
-| `compose/docker-compose.yaml` | `devops` | Orquestração de serviços, healthchecks, networking, volumes nomeados |
-| `compose/docker-compose.dev.yml` | `devops` | Overlay de volumes e variáveis de dev sobre o compose base |
-| `compose/.env.example` | `devops` | Documentação de variáveis necessárias por ambiente |
+| `compose/docker-compose.yaml` | `dev-docker-compose` | Orquestração de serviços, healthchecks, networking, volumes nomeados |
+| `compose/docker-compose.dev.yml` | `dev-docker-compose` | Overlay de volumes e variáveis de dev sobre o compose base |
+| `compose/.env.example` | `dev-docker-compose` | Documentação de variáveis necessárias por ambiente |
 
 ## Como usar estes exemplos
 
-Quando o `dev-fullstack`, `dev-fullstack` ou `devops` for criar ou
+Quando o `dev-fullstack` ou `dev-docker-compose` for criar ou
 atualizar os arquivos correspondentes no projeto real, **eles devem ler o
 exemplo desta pasta antes** — exatamente como funciona com as outras
 skills. A diferença é que esses são arquivos de configuração inteiros, não

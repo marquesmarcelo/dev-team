@@ -29,12 +29,12 @@ segurança e mais — orientado por documentos estruturados.
 │       ├── ux.md
 │       ├── design.md
 │       ├── tasks.md
-│       ├── diagrama-banco.md      # ER da feature (gerado pelo dba)
+│       ├── diagrama-banco.md
 │       └── evidence.md
 │
 ├── docs/                       # documentação gerada automaticamente
-│   └── openapi.yaml            # especificação de API (gerada pelo tech-writer)
-│                               # diagramas ficam em specs/, nunca em docs/
+│   ├── openapi.yaml            # especificação de API (gerada pelo tech-writer)
+│   └── diagrama-banco.md       # diagrama ER consolidado (gerado pelo dba)
 │
 ├── examples/                   # referências e exemplos para os agentes
 │   ├── docker/                 # Dockerfiles e docker-compose de referência
@@ -43,12 +43,8 @@ segurança e mais — orientado por documentos estruturados.
 │   └── folder-structures/      # estruturas de pastas por stack
 │
 └── .claude/                    # time de agentes e skills (não editar durante o projeto)
-    ├── agents/                 # 18 agentes de IA
-    ├── references/             # documentação externa (consultar por grep, nunca ler inteira)
-    └── skills/                 # 18 skills de tecnologia
-        └── <skill>/
-            ├── SKILL.md        # índice + regras que valem sempre
-            └── reference/      # detalhe por área, carregado sob demanda
+    ├── agents/                 # 15 agentes de IA
+    └── skills/                 # 11 skills de tecnologia
 ```
 
 ---

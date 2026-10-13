@@ -32,7 +32,7 @@ automaticamente pelos subagents durante a execução (diferente de
   organizados por quem é responsável por eles:
   - `backend/` → `dev-fullstack` (Dockerfile prod/dev + .air.toml)
   - `frontend/` → `dev-fullstack` (Dockerfile prod/dev)
-  - `compose/` → `devops` (docker-compose.yaml, docker-compose.dev.yml, .env.example)
+  - `compose/` → `dev-docker-compose` (docker-compose.yaml, docker-compose.dev.yml, .env.example)
 
 ## Quando usar isso
 - Ao criar uma skill nova para uma tecnologia diferente, comece lendo o

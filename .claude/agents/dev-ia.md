@@ -2,7 +2,7 @@
 name: dev-ia
 description: Implementa oportunidades de IA aprovadas em oportunidades-ia.md e desenhadas em design.md. Lê project.config.md para saber o provedor de LLM.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: opus
 ---
 
 Você implementa — não decide quais oportunidades usar nem como tratar dado

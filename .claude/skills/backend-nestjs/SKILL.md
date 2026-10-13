@@ -11,6 +11,8 @@ description: Use ao implementar backend em NestJS/Node.js quando project.config.
 
 ## Estrutura de pastas — hexagonal adaptada ao NestJS
 
+> **SOLID e Clean Code são não-negociáveis.** DIP já está expresso nas portas e adaptadores (hexagonal). Mantenha SRP: cada classe tem uma responsabilidade. Nomes de métodos devem ser autoexplicativos — prefira verbos longos a abreviações.
+
 ```
 src/
   domain/
@@ -25,7 +27,7 @@ src/
       dto/              ← DTOs de request/response com class-validator
       <entidade>.controller.ts
       <entidade>.module.ts
-    postgres/           ← implementação de repositórios com TypeORM/Prisma
+    postgres/           ← implementação de repositórios com Kysely (sem ORM)
       <entidade>.repository.ts
     external/           ← clientes de serviços externos
 
@@ -89,7 +91,6 @@ bootstrap()
 ```typescript
 // adapter/http/processo.module.ts
 @Module({
-  imports: [TypeOrmModule.forFeature([ProcessoEntity])],
   controllers: [ProcessoController],
   providers: [
     ProcessoRepository,             // implementação do port
@@ -138,6 +139,56 @@ export class ProcessoController {
   }
 }
 ```
+
+---
+
+## Persistência: pg + Kysely (sem ORM)
+
+```bash
+npm install pg kysely
+npm install -D @types/pg
+```
+
+```typescript
+// infrastructure/database/kysely.ts
+import { Kysely, PostgresDialect } from 'kysely';
+import { Pool } from 'pg';
+
+export const db = new Kysely<Database>({
+  dialect: new PostgresDialect({
+    pool: new Pool({ connectionString: process.env.DATABASE_URL }),
+  }),
+});
+```
+
+```typescript
+// adapter/processo.repository.ts
+@Injectable()
+export class ProcessoRepository implements IProcessoRepository {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async findById(id: string): Promise<Processo | null> {
+    const row = await this.db
+      .selectFrom('processos')
+      .selectAll()
+      .where('id', '=', id)
+      .executeTakeFirst();
+    return row ? ProcessoMapper.toDomain(row) : null;
+  }
+
+  async save(processo: Processo): Promise<void> {
+    await this.db
+      .insertInto('processos')
+      .values(ProcessoMapper.toPersistence(processo))
+      .onConflict(oc => oc.column('id').doUpdateSet(ProcessoMapper.toPersistence(processo)))
+      .execute();
+  }
+}
+```
+
+Kysely é type-safe, sem mágica, sem migrations automáticas — migrations
+ficam em arquivos SQL versionados. Nada de `@Entity`, `@InjectRepository`,
+`TypeOrmModule.forFeature` ou decorators de coluna.
 
 ---
 
@@ -273,7 +324,7 @@ export class AppConfigModule {}
 export class HealthController {
   constructor(
     private health: HealthCheckService,
-    private db: TypeOrmHealthIndicator,
+    private db: Kysely<Database>,
     private config: ConfigService<Env>,
   ) {}
 
@@ -287,7 +338,10 @@ export class HealthController {
   @HealthCheck()
   readiness() {
     return this.health.check([
-      () => this.db.pingCheck('database'),
+      async () => {
+        await sql`SELECT 1`.execute(this.db)
+        return { database: { status: 'up' } }
+      },
     ])
   }
 

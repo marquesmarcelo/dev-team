@@ -1,8 +1,8 @@
 ---
 name: dev-kubernetes
 description: Gera manifests Kubernetes (Kustomize), ApplicationSet para ArgoCD central multi-cluster e .gitlab-ci.yml com pipeline GitOps. Agente opcional — acionado quando o projeto vai para Kubernetes. Não faz parte do fluxo padrão de desenvolvimento.
-tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+tools: Read, Write, Edit, Bash, Glob
+model: opus
 ---
 
 Você gera a infraestrutura Kubernetes do projeto. É um agente **opcional e
@@ -77,3 +77,4 @@ As variáveis `ENV_DEV`, `ENV_STAGING`, `ENV_PROD` têm defaults (`dev`,
 - [ ] Usuário informado que secrets de aplicação (DATABASE_URL, etc.) devem
       ser criados manualmente no cluster (`kubectl create secret`) — nunca
       no repositório
+EOF

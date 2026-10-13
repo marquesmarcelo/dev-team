@@ -1,7 +1,7 @@
 ---
 name: auditor-projeto
 description: Verifica se um projeto existente atende às definições atuais dos agentes e skills. Gera relatório de conformidade com achados por severidade e plano de atualização priorizado. Usar após atualizar agentes/skills ou ao incorporar projeto legado ao template SDD.
-tools: Read, Grep, Glob, Bash
+tools: Read, Glob, Bash
 model: opus
 ---
 
@@ -18,20 +18,6 @@ Leia os seguintes arquivos antes de qualquer análise:
 
 ## Protocolo de análise
 
-**A fonte da verdade é o `CLAUDE.md`, não este checklist.** As categorias
-abaixo são o roteiro de navegação: elas dizem onde olhar, não o que é
-regra. Antes de auditar, leia o `CLAUDE.md` inteiro e monte a lista de
-regras vigentes a partir dele — se uma regra existe lá e não aparece aqui,
-ela vale mesmo assim e o achado é legítimo.
-
-Ao terminar, se encontrar regra do `CLAUDE.md` que nenhuma categoria deste
-arquivo cobre, registre no fim do relatório:
-
-> "Regras do CLAUDE.md não cobertas pelo checklist do auditor: <lista>.
-> Sugiro atualizar `.claude/agents/auditor-projeto.md`."
-
-Assim o checklist não fica em silêncio quando o padrão evolui.
-
 Percorra o código do projeto verificando cada categoria abaixo.
 Para cada item encontrado: registrar arquivo, linha e severidade.
 
@@ -42,13 +28,8 @@ Para cada item encontrado: registrar arquivo, linha e severidade.
 - [ ] Dependência de domínio em adapter? (adapter importando de outro adapter = ⚠️)
 
 ### Categoria 2 — Banco de dados
-- [ ] Existe dual write no código (use case que grava no banco e publica
-      evento / escreve em cache / chama API externa fora da transação)?
-      Se sim: tabela `outbox` presente e relay implementado?
 - [ ] Todas as entidades têm UUID como PK?
 - [ ] Todas as entidades têm `criado_em`, `atualizado_em`, `excluido_em`?
-- [ ] Entidades editáveis por usuário têm `versao` e `UPDATE` condicional
-      (concorrência otimista)?
 - [ ] Deleção lógica implementada (`WHERE excluido_em IS NULL` nas queries)?
 - [ ] Migrations com instrução de rollback (`down`)?
 - [ ] Índices em colunas usadas em `WHERE` e `ORDER BY`?
@@ -56,16 +37,12 @@ Para cada item encontrado: registrar arquivo, linha e severidade.
 
 ### Categoria 3 — API e observabilidade
 - [ ] `/healthz` e `/readyz` implementados?
-- [ ] `/version` implementado e retornando `{ app, backend, frontend, buildDate, commit }`?
+- [ ] `/version` implementado e retornando `{ app, version, buildDate, commit }`?
 - [ ] `/metrics` (Prometheus) implementado?
 - [ ] OpenAPI gerada automaticamente (nunca escrita à mão)?
 - [ ] `docs/openapi.yaml` atualizado?
 
 ### Categoria 4 — Frontend
-- [ ] Área de conteúdo alinhada à esquerda e em largura total (sem
-      `mx-auto`+`max-w-*` no wrapper de página)?
-- [ ] Tabelas em `w-full` e formulários em grid multi-coluna no desktop?
-- [ ] Telas sem scroll horizontal em 360px?
 - [ ] `LoadingButton` em `shared/ui/` (nunca `<Button disabled>` sem spinner)?
 - [ ] Indicador de navegação global (NProgress ou equivalente)?
 - [ ] Sistema de toast (`notify.sucesso/erro/aviso/info`)?
@@ -81,33 +58,19 @@ Para cada item encontrado: registrar arquivo, linha e severidade.
 - [ ] Testes unitários existem para os use cases?
 - [ ] Testes E2E existem para os fluxos principais?
 
-### Categoria 6 — LGPD e dado pessoal
-- [ ] `spec.md` das features com dado pessoal tem a tabela de classificação por campo?
-- [ ] Log, auditoria e mensagem de erro estão livres de CPF, RG e dado sensível?
-- [ ] Seed e fixtures usam dado fictício (nenhum dado real de produção)?
-- [ ] Identificador forte mascarado na listagem?
-- [ ] Prazo de retenção declarado por entidade com dado pessoal?
-
-### Categoria 7 — Formato, fuso e locale
-- [ ] Colunas de data/hora em `TIMESTAMPTZ` (nunca `TIMESTAMP` sem fuso)?
-- [ ] API transporta data em ISO 8601 com offset (nunca `dd/mm/aaaa`)?
-- [ ] Frontend formata com `Intl` (nunca concatenação manual)?
-- [ ] Filtro por data usa intervalo de instantes (nunca `DATE(coluna) = ...`)?
-- [ ] Valor monetário em `NUMERIC`, nunca `float`?
-
-### Categoria 8 — Segurança e qualidade
+### Categoria 6 — Segurança e qualidade
 - [ ] `sonar-project.properties` na raiz?
 - [ ] `.gitignore` cobre `.env`, `node_modules`, binários e arquivos de IDE?
 - [ ] Segredos via variáveis de ambiente (nunca hardcoded)?
 - [ ] Ports de auth (`AuthorizationChecker`) e auditoria (`AuditLogger`) referenciados?
 
-### Categoria 9 — Docker e CI/CD
+### Categoria 7 — Docker e CI/CD
 - [ ] Dois Dockerfiles por serviço (`Dockerfile.dev` + `Dockerfile`)?
 - [ ] `docker-compose.yaml` (produção) + `docker-compose.dev.yml` (dev)?
 - [ ] `.env.example` atualizado com todas as variáveis necessárias?
 - [ ] `VERSION` na raiz do projeto?
 
-### Categoria 10 — UX (se há frontend)
+### Categoria 8 — UX (se há frontend)
 - [ ] Grid segue padrão: filtros → botão "Pesquisar" → grid (nunca busca automática)?
 - [ ] Grid tem 4 estados: loading (skeleton), error (+retry), empty, data?
 - [ ] Filtros + paginação salvos no localStorage?

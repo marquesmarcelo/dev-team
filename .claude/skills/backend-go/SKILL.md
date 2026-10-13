@@ -22,6 +22,9 @@ Consultar https://pkg.go.dev para versão atual das dependências principais.
 Se houver diferença significativa, verificar breaking changes no CHANGELOG.
 
 ## Estrutura de pastas
+
+> **SOLID e Clean Code são não-negociáveis.** DIP já está expresso nas portas e adaptadores (hexagonal). Mantenha SRP: cada classe tem uma responsabilidade. Nomes de métodos devem ser autoexplicativos — prefira verbos longos a abreviações.
+
 ```
 /internal
   /domain      → entidades e regras de negócio puras, sem dependência externa
@@ -40,7 +43,7 @@ Se houver diferença significativa, verificar breaking changes no CHANGELOG.
 
 ## Convenções específicas de Go
 - `/domain` e `/usecase` nunca importam `github.com/gin-gonic/gin`,
-  `github.com/jmoidx/sqlx`, nem qualquer driver de banco.
+  `github.com/jmoiron/sqlx`, nem qualquer driver de banco.
 - Interfaces de `/port` pequenas e específicas (ex: `ProcessoFinder` em vez
   de um `ProcessoRepository` genérico, quando o use case só precisa buscar)
   — Interface Segregation natural do Go.
@@ -420,7 +423,7 @@ desenvolvedor, o `Dockerfile`/`docker-compose.yml` está incompleto —
 corrija lá, nunca documente "rode X na sua máquina antes" como solução.
 
 ## Migrations automáticas ao subir o ambiente
-O `docker-compose.yml` (responsabilidade do `devops`) inclui um serviço
+O `docker-compose.yml` (responsabilidade do `dev-docker-compose`) inclui um serviço
 `migrate` que roda golang-migrate contra o banco antes do backend subir:
 ```yaml
 services:

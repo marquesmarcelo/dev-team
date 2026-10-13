@@ -7,6 +7,8 @@ description: Use ao implementar backend em Java com Spring Boot, quando project.
 
 ## Estrutura de pastas (por bounded context)
 
+> **SOLID e Clean Code são não-negociáveis.** DIP já está expresso nas portas e adaptadores (hexagonal). Mantenha SRP: cada classe tem uma responsabilidade. Nomes de métodos devem ser autoexplicativos — prefira verbos longos a abreviações.
+
 ```
 src/main/java/com/projeto/
   processo/                     # bounded context
@@ -39,10 +41,10 @@ src/main/java/com/projeto/
           ProcessoController.java   # @RestController — delgado
       out/
         persistence/
-          ProcessoJpaRepository.java   # Spring Data JPA (queries simples)
-          ProcessoQueryRepository.java # @Query customizado (queries complexas)
+          ProcessoJdbcRepository.java  # JdbcClient + SQL direto
+          ProcessoQueryRepository.java # listagens/relatórios (SQL direto)
           mapper/
-            ProcessoMapper.java       # MapStruct
+            ProcessoRowMapper.java    # ResultSet → domínio
 ```
 
 Regra inegociável: `domain` e `usecase` NUNCA dependem de `adapter`.
@@ -122,33 +124,106 @@ public class ProcessoController {
 }
 ```
 
-## Acesso a dados: Spring Data JPA + @Query customizado
+## Acesso a dados: JdbcClient + SQL direto (sem JPA)
 
-Para CRUD simples: Spring Data JPA Repository.
-Para queries complexas (relatórios, filtros, paginação):
+Biblioteca leve de mapeamento: `spring-boot-starter-jdbc` com `JdbcClient`
+(Spring 6.1+) ou `NamedParameterJdbcTemplate`. Nada de `@Entity`,
+`JpaRepository`, `EntityManager` ou JPQL.
+
+```xml
+<!-- pom.xml -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+```
 
 ```java
-// adapter/out/persistence/ProcessoQueryRepository.java
-@Repository
-@RequiredArgsConstructor
-public class ProcessoQueryRepository {
-    private final EntityManager em;
+// adapter/out/persistence/ProcessoJdbcRepository.java
+@Component
+public class ProcessoJdbcRepository implements ProcessoRepository {
+    private final JdbcClient jdbc;
 
-    private static final Set<String> COLUNAS_ORDENAVEIS =
-        Set.of("criadoEm", "descricao", "status");
+    public ProcessoJdbcRepository(JdbcClient jdbc) {
+        this.jdbc = jdbc;
+    }
 
-    public Page<ProcessoListagem> listar(Pageable pageable, String sort, String order) {
-        String coluna = COLUNAS_ORDENAVEIS.contains(sort) ? sort : "criadoEm";
-        // JPQL com parâmetros — nunca concatenação de string de input
-        return em.createQuery("""
-            SELECT p FROM Processo p
-            WHERE p.excluidoEm IS NULL
-            ORDER BY p.""" + coluna + (order.equals("desc") ? " DESC" : " ASC"),
-            ProcessoListagem.class
-        ).setFirstResult(...).setMaxResults(...).getResultList();
+    @Override
+    public Optional<Processo> findById(UUID id) {
+        return jdbc.sql("SELECT * FROM processos WHERE id = :id")
+            .param("id", id)
+            .query(ProcessoRowMapper::mapRow)
+            .optional();
+    }
+
+    @Override
+    public void save(Processo processo) {
+        jdbc.sql("""
+            INSERT INTO processos (id, numero, status, criado_em)
+            VALUES (:id, :numero, :status, :criadoEm)
+            ON CONFLICT (id) DO UPDATE SET
+              numero = EXCLUDED.numero,
+              status = EXCLUDED.status
+            """)
+            .param("id", processo.id())
+            .param("numero", processo.numero())
+            .param("status", processo.status().name())
+            .param("criadoEm", processo.criadoEm())
+            .update();
     }
 }
 ```
+
+```java
+// adapter/out/persistence/mapper/ProcessoRowMapper.java
+public class ProcessoRowMapper {
+    public static Processo mapRow(ResultSet rs, int rowNum) throws SQLException {
+        return new Processo(
+            UUID.fromString(rs.getString("id")),
+            rs.getString("numero"),
+            StatusProcesso.valueOf(rs.getString("status")),
+            rs.getTimestamp("criado_em").toInstant()
+        );
+    }
+}
+```
+
+Listagem com paginação e ordenação:
+
+```java
+// adapter/out/persistence/ProcessoQueryRepository.java
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+@Component
+@RequiredArgsConstructor
+public class ProcessoQueryRepository {
+    private final JdbcClient jdbc;
+
+    private static final Set<String> COLUNAS_ORDENAVEIS =
+        Set.of("criado_em", "descricao", "status");
+
+    public List<ProcessoListagem> listar(int page, int pageSize, String sort, String order) {
+        if (sort != null && !sort.isBlank() && !COLUNAS_ORDENAVEIS.contains(sort)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ordenação inválida: " + sort);
+        }
+        String coluna = (sort == null || sort.isBlank()) ? "criado_em" : sort;
+        String direcao = "desc".equals(order) ? "DESC" : "ASC";
+        // coluna e direção vêm da allowlist; valores do usuário só via parâmetro
+        return jdbc.sql("""
+            SELECT id, descricao, status, criado_em FROM processos
+            WHERE excluido_em IS NULL
+            ORDER BY """ + coluna + " " + direcao + " LIMIT :limit OFFSET :offset")
+            .param("limit", pageSize)
+            .param("offset", (page - 1) * pageSize)
+            .query(ProcessoListagem.class)
+            .list();
+    }
+}
+```
+
+Para queries complexas com joins, use jOOQ (geração de código a partir do
+schema) — nunca JPQL ou Criteria API.
 
 Allowlist obrigatória — nunca interpolar `sort` diretamente na query.
 
@@ -238,7 +313,7 @@ Endpoints automáticos:
 - `/actuator/health/readiness` → readiness probe Kubernetes (verifica DB, Redis)
 
 **Não implementar `/metrics`, `/healthz`, `/readyz` manualmente** — o
-Actuator já entrega o equivalente. O `devops` configura o `livenessProbe`
+Actuator já entrega o equivalente. O `dev-kubernetes` configura o `livenessProbe`
 e `readinessProbe` do manifesto Kubernetes apontando para os endpoints do
 Actuator.
 

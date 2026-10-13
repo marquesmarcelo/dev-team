@@ -10,24 +10,72 @@ description: Use ao implementar frontend em Next.js com shadcn/ui, quando projec
 > de nomear arquivos, componentes ou hooks. Exemplo de árvore de pastas
 > completa em `examples/folder-structures/frontend-nextjs-shadcn.md`.
 
-## Como usar esta skill
+## Qualidade e contratos de código (Biome, knip, dependency-cruiser)
 
-Este arquivo tem as regras que valem para **todo** código de frontend deste
-projeto. O detalhe de cada área fica em `reference/`, carregado só quando
-você for trabalhar naquela área — ler tudo de uma vez desperdiça contexto
-que você vai precisar para o spec, o design e o código.
+> Regra universal em `CLAUDE.md`. Configurar na primeira entrega do projeto.
+> Arquivos de exemplo em `examples/quality/`.
 
-| Vou trabalhar em... | Leia |
-|---|---|
-| Layout base, header, sidebar, rodapé, toast, barra de progresso, `/version` | `reference/appshell.md` |
-| Listagem, paginação, ordenação, filtros, loading por linha | `reference/grid-e-listagem.md` |
-| Formulário, autocomplete, editor de texto rico, LoadingButton, dirty state | `reference/formularios.md` |
-| Skeleton, lazy loading, animação, estados de carregamento | `reference/estados-e-animacao.md` |
-| Dockerfile, Biome, knip, dependency-cruiser, CSP, `APP_ENV`, autenticação | `reference/ambiente-e-build.md` |
-| Acessibilidade WCAG e anti-padrões visuais | `reference/acessibilidade-e-design.md` |
+### Biome — lint + format (substitui ESLint + Prettier)
 
-As regras universais (hexagonal, deleção lógica, concorrência otimista,
-LGPD, fuso horário) estão no `CLAUDE.md` e não se repetem aqui.
+```bash
+npm install --save-dev @biomejs/biome
+cp examples/quality/biome.json .
+```
+
+```json
+// package.json — scripts
+{
+  "scripts": {
+    "lint":       "biome lint .",
+    "format":     "biome format --write .",
+    "check":      "biome check .",
+    "ci:quality": "biome ci ."
+  }
+}
+```
+
+No CI: `npm run ci:quality` — falha com exit 1 se houver lint ou formatação incorreta.
+
+### knip — detectar código morto
+
+```bash
+npm install --save-dev knip
+cp examples/quality/knip.config.ts .
+```
+
+```json
+// package.json
+{ "scripts": { "knip": "knip" } }
+```
+
+### dependency-cruiser — contratos arquiteturais
+
+```bash
+npm install --save-dev dependency-cruiser
+cp examples/quality/.dependency-cruiser.js .
+```
+
+```json
+// package.json
+{
+  "scripts": {
+    "arch:check":   "depcruise src --config .dependency-cruiser.js",
+    "arch:diagram": "depcruise src --output-type dot | dot -T svg > architecture.svg"
+  }
+}
+```
+
+Valida em CI que `shared/` nunca importa de `features/`, que `features/`
+não se importam diretamente entre si, e que não há dependências circulares.
+
+### commitlint + husky — Conventional Commits
+
+```bash
+npm install --save-dev @commitlint/cli @commitlint/config-conventional husky
+npx husky init
+echo "npx --no -- commitlint --edit \$1" > .husky/commit-msg
+cp examples/quality/commitlint.config.js .
+```
 
 ## ⚠️ Verificar versão antes de implementar
 
@@ -84,6 +132,7 @@ src/
 - Específico de uma entidade → `features/<entidade>/`
 - Componente `shared/` nunca importa de `features/`
 
+
 ## Convenções específicas
 - Instalar componente via `npx shadcn add <componente>` antes de
   implementar algo do zero — verificar primeiro se já existe equivalente
@@ -100,29 +149,1561 @@ src/
 - Acessibilidade: shadcn/ui já usa Radix por baixo (ARIA correto) — não
   sobrescrever atributos ARIA gerados pelos primitivos sem motivo forte.
 
+## Formulário de CRUD: componente autônomo (página ou modal)
+O formulário de criação/edição nunca sabe se está numa página ou num
+`Dialog` do shadcn/ui — ele só recebe props:
+```tsx
+interface ProcessoFormProps {
+  initialData?: Processo;        // presente = edição; ausente = criação
+  onSubmit: (data: ProcessoFormData) => void;
+  onCancel: () => void;
+}
 
-## Regras que valem sempre (não estão em reference/)
+export function ProcessoForm({ initialData, onSubmit, onCancel }: ProcessoFormProps) {
+  // ...
+}
+```
+Uso em página:
+```tsx
+<ProcessoForm onSubmit={salvar} onCancel={() => router.back()} />
+```
+Uso em modal:
+```tsx
+<Dialog open={open} onOpenChange={setOpen}>
+  <DialogContent>
+    <ProcessoForm onSubmit={salvar} onCancel={() => setOpen(false)} />
+  </DialogContent>
+</Dialog>
+```
+A decisão de página-vs-modal fica no componente que envolve o formulário,
+nunca dentro do `ProcessoForm` — ver `ux.md` da feature para qual dos dois
+foi decidido.
 
-Vale a pena ter estas na cabeça antes de abrir qualquer arquivo de
-referência, porque elas decidem o formato do código desde a primeira linha:
+## Autocomplete/Combobox com criação inline
 
-- **Zero comentário** em `.ts`, `.tsx`, `.js`, `.html`, `.css`. O bundle vai
-  para o browser. Achado 🔴 Crítico de segurança na revisão.
-- **Zero `fetch` dentro de componente.** Toda chamada de dados vive em hook
-  ou service.
-- **Componente compartilhado antes de componente de feature.** Se você vai
-  copiar algo de outra tela, pare e extraia para `components/shared/`.
-- **Nada de `localStorage`/`sessionStorage` para token.** JWT em cookie
-  `HttpOnly`. Achado 🔴 Crítico.
-- **Área de conteúdo alinhada à esquerda**, `w-full`, sem `mx-auto` +
-  `max-w-*` no wrapper de página. Ver `CLAUDE.md`, "Área de conteúdo".
-- **Nenhuma busca automática em grid.** Filtro → botão "Pesquisar" → grid.
-- **Todo botão assíncrono é `LoadingButton`**, com spinner e texto no
-  gerúndio.
-- **`prefers-reduced-motion`** desativa animação decorativa.
+> Padrão universal definido no `CLAUDE.md`. Use quando `ux.md` indicar campo
+> de autocomplete. O comportamento é o mesmo em qualquer tecnologia — esta
+> seção descreve apenas a implementação específica desta stack.
+
+Use o componente `<Command>` do shadcn/ui:
+
+```tsx
+// components/shared/autocomplete-create.tsx
+interface AutocompleteCreateProps<T extends { id: string; codigo: string; descricao: string }> {
+  value: T | null;
+  onChange: (item: T) => void;
+  onSearch: (query: string) => Promise<T[]>;
+  onCreateNew?: (descricao: string) => Promise<T>;  // undefined = sem criação inline
+  placeholder?: string;
+}
+
+export function AutocompleteCreate<T extends { id: string; codigo: string; descricao: string }>({
+  value, onChange, onSearch, onCreateNew, placeholder = "Buscar..."
+}: AutocompleteCreateProps<T>) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [items, setItems] = useState<T[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (query.length >= 1) setItems(await onSearch(query));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const exactMatch = items.some(i => i.descricao.toLowerCase() === query.toLowerCase());
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open}
+                className="w-full justify-between">
+          {value ? `${value.codigo} — ${value.descricao}` : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0">
+        <Command>
+          <CommandInput placeholder={placeholder} value={query} onValueChange={setQuery} />
+          <CommandList>
+            <CommandGroup>
+              {items.map(item => (
+                <CommandItem key={item.id} onSelect={() => { onChange(item); setOpen(false); }}>
+                  <Check className={cn("mr-2 h-4 w-4", value?.id === item.id ? "opacity-100" : "opacity-0")} />
+                  {item.codigo} — {item.descricao}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            {/* Criação inline: só se onCreateNew fornecido e não há correspondência exata */}
+            {onCreateNew && query.length > 0 && !exactMatch && (
+              <>
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem onSelect={async () => {
+                    setIsCreating(true);
+                    const novo = await onCreateNew(query);
+                    onChange(novo);
+                    setOpen(false);
+                    setIsCreating(false);
+                  }} disabled={isCreating}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {isCreating ? "Criando..." : `Criar "${query}"`}
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+```
+
+Endpoint de busca: `GET /api/v1/<entidade>/autocomplete?q=<texto>&limit=20`
+Retorno: `[{ id, codigo, descricao }]` — ILIKE no Postgres com índice na coluna.
+
+## Indicador de navegação entre rotas (barra no topo + item com loading)
+
+> Padrão universal em `CLAUDE.md`: **dois indicadores obrigatórios juntos.**
+> Implementar no AppShell — não por feature.
+
+**Lib:** `nprogress`
+```bash
+npm install nprogress && npm install --save-dev @types/nprogress
+```
+
+```tsx
+// components/layout/navigation-progress.tsx
+'use client'
+import { useEffect, useState } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
+import NProgress from 'nprogress'
+import 'nprogress/nprogress.css'
+
+NProgress.configure({ showSpinner: false, minimum: 0.15, speed: 300 })
+
+// Hook global para saber qual path está carregando (para o item do menu)
+let _setNavigatingTo: ((path: string | null) => void) | null = null
+
+export function useNavigatingTo() {
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
+  useEffect(() => { _setNavigatingTo = setNavigatingTo }, [])
+  return navigatingTo
+}
+
+export function NavigationProgress() {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    NProgress.done()
+    _setNavigatingTo?.(null)   // limpa o loading do item do menu
+  }, [pathname, searchParams])
+  return null
+}
+
+export function startNavigation(path: string) {
+  NProgress.start()
+  _setNavigatingTo?.(path)     // sinaliza qual item está carregando
+}
+```
+
+```css
+/* globals.css */
+#nprogress .bar { background: hsl(var(--primary)); height: 3px; }
+#nprogress .peg { box-shadow: 0 0 10px hsl(var(--primary)); }
+#nprogress .spinner { display: none; }
+```
+
+```tsx
+// components/layout/sidebar-nav-item.tsx
+'use client'
+import { Loader2 } from 'lucide-react'
+import { startNavigation, useNavigatingTo } from './navigation-progress'
+
+function SidebarNavItem({ item }: { item: NavItem }) {
+  const navigatingTo = useNavigatingTo()
+  const isLoading = navigatingTo === item.path
+
+  return (
+    <Link
+      href={item.path}
+      onClick={() => startNavigation(item.path)}
+      aria-busy={isLoading}
+      className={cn(
+        'flex items-center gap-2 p-2 rounded hover:bg-accent transition-opacity',
+        isLoading && 'opacity-70 pointer-events-none'  // bloqueia duplo clique
+      )}
+    >
+      {isLoading
+        ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        : <Icon name={item.icon} className="h-4 w-4" aria-hidden="true" />
+      }
+      <span>{item.label}</span>
+    </Link>
+  )
+}
+```
+
+```tsx
+// app/(shell)/layout.tsx
+import { Suspense } from 'react'
+import { NavigationProgress } from '@/components/layout/navigation-progress'
+
+export default function ShellLayout({ children }) {
+  return (
+    <div className="flex flex-col h-screen">
+      <Suspense><NavigationProgress /></Suspense>
+      <AppHeader ... />
+      ...
+    </div>
+  )
+}
+```
+
+**Interceptor HTTP automático — barra dispara em toda chamada fetch:**
+
+```ts
+// lib/fetch-with-progress.ts
+// Wrapper sobre fetch que controla NProgress automaticamente
+import { startNavigation, doneNavigation } from '@/components/layout/navigation-progress'
+
+let activeRequests = 0  // contador para múltiplas requisições simultâneas
+
+export async function fetchWithProgress(input: RequestInfo, init?: RequestInit): Promise<Response> {
+  activeRequests++
+  if (activeRequests === 1) startNavigation('')   // só inicia se não houver outra rodando
+
+  try {
+    return await fetch(input, init)
+  } finally {
+    activeRequests--
+    if (activeRequests === 0) doneNavigation()    // só completa quando todas terminarem
+  }
+}
+```
+
+```ts
+// lib/navigation-progress.tsx — adicionar doneNavigation e contador
+export const startNavigation = (path: string) => {
+  NProgress.start()
+  _setNavigatingTo?.(path)
+}
+export const doneNavigation = () => {
+  NProgress.done()
+  _setNavigatingTo?.(null)
+}
+```
+
+```ts
+// hooks/use-api.ts — todos os hooks usam fetchWithProgress
+import { fetchWithProgress } from '@/lib/fetch-with-progress'
+
+export function useProcessos() {
+  async function pesquisar(filtros: FiltroProcesso) {
+    // fetchWithProgress dispara a barra automaticamente
+    const res = await fetchWithProgress('/api/v1/processos?' + new URLSearchParams(filtros as any))
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  }
+  return { pesquisar }
+}
+```
+
+**Qualquer link de navegação** (não só menu) dispara a barra:
+```tsx
+// Wrapper para links comuns — usar no lugar de <Link> quando necessário
+import { startNavigation } from '@/components/layout/navigation-progress'
+
+export function NavLink({ href, children, ...props }: LinkProps) {
+  return (
+    <Link href={href} onClick={() => startNavigation(href as string)} {...props}>
+      {children}
+    </Link>
+  )
+}
+```
+
+---
+
+## Sistema de notificações toast
+
+> Padrão universal em `CLAUDE.md`. Implementar no AppShell — não por feature.
+
+**Lib:** Sonner (já vem com shadcn/ui)
+```bash
+npx shadcn@latest add sonner
+```
+
+```tsx
+// app/(shell)/layout.tsx — adicionar uma vez
+import { Toaster } from '@/components/ui/sonner'
+// <Toaster position="top-right" richColors expand={false} />
+
+// lib/notify.ts — wrapper para uso em toda a aplicação
+import { toast } from 'sonner'
+export const notify = {
+  sucesso: (msg: string, desc?: string) => toast.success(msg, { description: desc, duration: 4000 }),
+  erro:    (msg: string, desc?: string) => toast.error(msg,   { description: desc, duration: 8000 }),
+  aviso:   (msg: string, desc?: string) => toast.warning(msg, { description: desc, duration: 6000 }),
+  info:    (msg: string, desc?: string) => toast.info(msg,    { description: desc, duration: 4000 }),
+}
+
+// Uso nos hooks após operação assíncrona:
+// import { notify } from '@/lib/notify'
+// notify.sucesso('Processo criado', 'Registrado com sucesso.')
+// notify.erro('Erro ao salvar', err.message)
+```
+
+`richColors` aplica cores e ícones (✅ ❌ ⚠️ ℹ️) automaticamente.
+
+---
 
 ## Relação com o UX Designer
 - Antes de implementar uma tela nova, leia `specs/<feature>/ux.md` (gerado
   pelo subagent `ux-designer`) para fluxo, estados de tela (vazio, erro,
   carregando) e hierarquia visual — não improvise layout sem esse
   documento quando ele existir.
+
+## Dois Dockerfiles por serviço
+> Antes de criar ou atualizar qualquer Dockerfile, leia os exemplos em
+> `examples/docker/frontend/` — são os arquivos de referência deste projeto.
+
+- `Dockerfile` — produção: multi-stage, imagem final com apenas o output
+  do `next build` (standalone + static). Ver
+  `examples/docker/frontend/Dockerfile`.
+- `Dockerfile.dev` — desenvolvimento: imagem Node completa, não copia
+  código (vem do volume), roda `npm install && npm run dev` na
+  inicialização. Ver `examples/docker/frontend/Dockerfile.dev`.
+
+## .dockerignore (obrigatório, criado junto com o Dockerfile)
+```
+node_modules
+.next
+out
+.env
+.env.*
+*.log
+.git
+```
+
+## Comandos sempre via container
+```bash
+docker compose run --rm frontend npm install
+docker compose run --rm frontend npm run lint
+docker compose run --rm frontend npm run build
+```
+Mesma regra do backend: se algo só funciona instalando na máquina do
+desenvolvedor, o ambiente containerizado está incompleto.
+
+## Acessibilidade (WCAG 2.2 AA — obrigatório, não opcional)
+
+> Leia `.claude/skills/accessibility/SKILL.md` antes de implementar qualquer
+> tela nova. O resumo abaixo cobre os pontos mais críticos na prática com
+> shadcn/ui, mas a skill tem o padrão completo.
+
+**O que o Radix/shadcn já entrega (não refazer):**
+- ARIA roles em todos os componentes interativos
+- Gerenciamento de foco em Dialog, Modal, DropdownMenu
+- `Escape` fecha dropdown/dialog
+- `aria-expanded` em Accordion, Collapsible, Select
+
+**O que você ainda precisa garantir:**
+- `<label>` associado a cada campo — nunca depender só de `placeholder`
+- Mensagens de erro vinculadas via `aria-describedby`
+- `alt` descritivo em imagens informativas; `alt=""` em decorativas
+- `aria-label` em botões de ícone sem texto visível
+- `aria-live="polite"` em resultados de busca e mensagens de status que
+  atualizam sem recarregar
+- Nunca adicionar `* { outline: none }` — remove foco de teclado de tudo
+- Nunca usar `autocomplete="off"` em campos de senha — bloqueia gerenciador
+  de senhas
+- Área de toque mínima de 24x24px (idealmente 44x44px) em botões de ícone
+- Não sobrescrever cores com valores de baixo contraste — usar variáveis CSS
+  do tema shadcn
+
+**Para sistemas públicos governamentais — verificar se eMAG é necessário**
+(ver skill de acessibilidade).
+
+## UI assíncrona por padrão (obrigatório em todo componente interativo)
+
+Toda ação que chama o backend segue este padrão — não é opcional por
+componente.
+
+### Hook expõe estados, componente reflete
+
+```ts
+// O componente nunca gerencia loading/submitting — vem do hook
+const { data, isLoading, isSubmitting, error, search } = useProcessos();
+```
+
+### Botão de qualquer ação
+
+```tsx
+<Button
+  onClick={handlePesquisar}
+  disabled={isLoading || isSubmitting}  // desabilitado durante qualquer operação
+>
+  {isLoading ? (
+    <><Spinner className="mr-2 h-4 w-4" /> Aguarde...</>
+  ) : (
+    'Pesquisar'
+  )}
+</Button>
+```
+
+Regra: **nunca** um botão que dispara ação para o backend permanece
+habilitado enquanto a operação está em andamento. Isso previne:
+- Duplo clique criando dois objetos
+- Dupla pesquisa com resultados se sobrepondo
+- Duplo submit de formulário
+
+### Formulário durante envio
+
+```tsx
+<fieldset disabled={isSubmitting}>  {/* desabilita todos os campos */}
+  <Input name="descricao" />
+  <Select name="categoria" />
+  <Button type="submit" disabled={isSubmitting}>
+    {isSubmitting ? 'Salvando...' : 'Salvar'}
+  </Button>
+</fieldset>
+```
+
+### Grid com estados visualmente distintos
+
+```tsx
+function ProcessoGrid({ state, data, meta }: Props) {
+  if (state.isLoading) {
+    return <GridSkeleton rows={state.pageSize} />;  // skeleton, não vazio
+  }
+  if (state.hasError) {
+    return (
+      <GridError
+        message={state.error}
+        onRetry={state.retry}  // sempre oferecer retry
+      />
+    );
+  }
+  if (!data.length) {
+    return <GridEmpty message="Nenhum resultado encontrado" />;  // distinto do loading
+  }
+  return (
+    <DataTable data={data} columns={columns} />
+  );
+}
+```
+
+**Os quatro estados são obrigatórios e visualmente distintos:**
+- `isLoading` → skeleton rows (usuário sabe que está carregando)
+- `hasError` → mensagem + botão de tentar novamente
+- `isEmpty` → mensagem "sem resultados" (não vazio em branco)
+- `hasData` → tabela/grid real
+
+### Testes E2E devem verificar estes estados
+
+O `dev-fullstack` (nos testes E2E da Fase Release) verifica explicitamente:
+- Botão desabilitado durante carregamento (`expect(button).toBeDisabled()`)
+- Grid mostra loading antes do resultado (`expect(skeleton).toBeVisible()`)
+- Estado vazio diferente de loading (`expect(emptyMessage).toBeVisible()`)
+
+## Grid de listagem: paginação e ordenação (obrigatório, ver CLAUDE.md)
+
+Três comportamentos sempre juntos: clique alterna asc/desc, ordenação
+padrão garantida, e estado persistido entre visitas.
+
+### Hook de estado do grid (URL + localStorage combinados)
+
+**Três regras de ouro:**
+1. **Grid não executa busca automática ao carregar** — só após o usuário clicar em "Pesquisar". Isso evita requisição desnecessária quando o usuário ainda quer ajustar os filtros.
+2. **Filtros e critérios de ordenação voltam preenchidos** ao retornar à tela — restaurados do localStorage antes de qualquer interação do usuário.
+3. URL reflete o estado atual — página compartilhável com os mesmos filtros.
+
+A URL é a fonte de verdade para compartilhar; o `localStorage` faz os filtros voltarem preenchidos quando o usuário retorna à tela. Regra de reconciliação: se a URL já tem parâmetros explícitos (link compartilhado), a URL vence; se a URL está "limpa" (navegação normal), hidrata a partir do `localStorage`; se não há nada em nenhum dos dois, usa os defaults de `design.md`.
+
+```ts
+// hooks/use-grid-state.ts
+const STORAGE_KEY_PREFIX = 'grid-state:';
+
+interface GridState {
+  filtros: Record<string, string>;
+  sort: string;
+  order: 'asc' | 'desc';
+  page: number;
+  pageSize: number;
+}
+
+export function useGridState(feature: string, defaults: GridState) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const storageKey = STORAGE_KEY_PREFIX + feature;
+
+  const [state, setState] = useState<GridState>(() => {
+    if (searchParams.toString()) {
+      // URL explícita vence — parseia os params com fallback nos defaults
+      return parseParamsOrDefaults(searchParams, defaults);
+    }
+    const salvo = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
+    return salvo ? JSON.parse(salvo) : defaults;
+  });
+
+  function updateState(partial: Partial<GridState>) {
+    const novo = { ...state, ...partial };
+    setState(novo);
+    localStorage.setItem(storageKey, JSON.stringify(novo));
+    router.push(`?${toSearchParams(novo)}`, { scroll: false });
+  }
+
+  function toggleSort(coluna: string) {
+    if (state.sort === coluna) {
+      // mesma coluna: alterna asc <-> desc (nunca um terceiro estado "sem ordenação")
+      updateState({ sort: coluna, order: state.order === 'asc' ? 'desc' : 'asc' });
+    } else {
+      // coluna diferente: assume a nova coluna, começa em crescente
+      updateState({ sort: coluna, order: 'asc', page: 1 });
+    }
+  }
+
+  function updateFiltros(filtros: Record<string, string>) {
+    // mudar filtro sempre volta para a página 1 — manter a página antiga
+    // depois de um filtro novo mostraria resultado incoerente
+    updateState({ filtros, page: 1 });
+  }
+
+  return { state, toggleSort, updateFiltros, updateState };
+}
+```
+
+### Cabeçalho de coluna clicável
+```tsx
+function ColumnHeader({ coluna, label, state, onSort }: ColumnHeaderProps) {
+  const ativo = state.sort === coluna;
+  return (
+    <TableHead
+      role="button"
+      tabIndex={0}
+      onClick={() => onSort(coluna)}
+      aria-sort={ativo ? (state.order === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      {label} {ativo && (state.order === 'asc' ? '↑' : '↓')}
+    </TableHead>
+  );
+}
+```
+
+### Defaults vêm de design.md, nunca inventados no componente
+```ts
+const defaults: GridState = {
+  filtros: {},
+  sort: 'criado_em',   // valor definido em design.md pelo arquiteto
+  order: 'desc',       // idem
+  page: 1,
+  pageSize: 20,
+};
+```
+
+### Paginação resiliente a estado obsoleto
+Se o `localStorage` tiver uma página salva (ex: página 5) mas a busca
+atual só retornar 2 páginas (`meta.total_pages`), o componente clampa
+para a última página válida em vez de mostrar grid vazio — nunca confiar
+ciegamente no número salvo sem validar contra a resposta real da API.
+
+## AppShell (estrutura única, criada na primeira funcionalidade visual)
+```
+app/
+  page.tsx                 # rota raiz = LOGIN, não a aplicação
+  (shell)/
+    layout.tsx              # combina header + sidebar + conteúdo + footer
+    dashboard/page.tsx
+    processos/page.tsx
+    ...
+components/
+  shell/
+    app-shell.tsx           # layout root
+    app-header.tsx          # logo + título + toggle + info do usuário
+    app-sidebar.tsx         # menu hierárquico (accordion 2 níveis)
+    app-footer.tsx          # rodapé fixo
+    sidebar-group.tsx       # grupo expansível do menu
+    nav-config.ts           # configuração do menu (não hardcoded nos componentes)
+```
+
+### Header
+```tsx
+// app-header.tsx
+export function AppHeader({ onToggleSidebar, sidebarOpen }: HeaderProps) {
+  return (
+    <header className="h-16 border-b flex items-center px-4 gap-4">
+      <Button variant="ghost" size="icon" onClick={onToggleSidebar}
+              aria-label={sidebarOpen ? "Recolher menu" : "Expandir menu"}>
+        <Menu className="h-5 w-5" />
+      </Button>
+      <img src="/logo.svg" alt="Logo" className="h-8 w-8" />
+      <span className="font-semibold text-lg">{SYSTEM_NAME}</span>
+      <div className="ml-auto flex items-center gap-2">
+        {/* nome do usuário + avatar + dropdown de logout */}
+      </div>
+    </header>
+  );
+}
+```
+
+### Menu hierárquico (2 níveis com accordion)
+```tsx
+// nav-config.ts — nunca hardcoded nos componentes
+export const NAV_CONFIG: NavGroup[] = [
+  {
+    label: "Cadastros", icon: "users",
+    items: [
+      { label: "Clientes", path: "/app/clientes" },
+      { label: "Fornecedores", path: "/app/fornecedores" },
+    ]
+  },
+  {
+    label: "Tabelas Acessórias", icon: "table",
+    items: [
+      { label: "Categorias", path: "/app/categorias" },
+    ]
+  },
+];
+
+// app-sidebar.tsx usando shadcn/ui Collapsible
+function SidebarGroup({ group, collapsed }: { group: NavGroup, collapsed: boolean }) {
+  return (
+    <Collapsible defaultOpen>
+      <CollapsibleTrigger className="flex items-center gap-2 w-full p-2">
+        <Icon name={group.icon} />
+        {!collapsed && <span>{group.label}</span>}
+        {!collapsed && <ChevronDown className="ml-auto" />}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        {group.items.map(item => (
+          <Link key={item.path} href={item.path}
+                className="flex items-center gap-2 p-2 pl-8 hover:bg-accent">
+            {item.label}
+          </Link>
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+```
+
+Quando sidebar recolhida: mostrar apenas ícones dos grupos. Ao hover,
+mostrar tooltip com o nome do grupo.
+
+### Rodapé
+```tsx
+// app-footer.tsx
+export function AppFooter() {
+  return (
+    <footer className="h-10 border-t flex items-center justify-center px-4 text-sm text-muted-foreground">
+      {SYSTEM_NAME} v{VERSION} — {new Date().getFullYear()}
+      {/* Para DSGOV: links obrigatórios do Padrão Digital de Governo */}
+    </footer>
+  );
+}
+```
+
+### Layout do shell
+```tsx
+// (shell)/layout.tsx
+export default function ShellLayout({ children }: { children: ReactNode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  return (
+    <div className="flex flex-col h-screen">
+      <AppHeader onToggleSidebar={() => setSidebarOpen(v => !v)} sidebarOpen={sidebarOpen} />
+      <div className="flex flex-1 overflow-hidden">
+        <AppSidebar open={sidebarOpen} navConfig={NAV_CONFIG} />
+        <main className="flex-1 overflow-auto p-6">{children}</main>
+      </div>
+      <AppFooter />
+    </div>
+  );
+}
+```
+
+- Login (`app/page.tsx`) não usa o ShellLayout — é página isolada.
+
+## Versão da aplicação no frontend
+
+**Rodapé com versão** (injetada em build time via variável de ambiente):
+```tsx
+// components/layout/app-footer.tsx
+export function AppFooter() {
+  return (
+    <footer className="h-10 border-t flex items-center justify-center
+                       px-4 text-sm text-muted-foreground gap-4">
+      <span>{process.env.NEXT_PUBLIC_APP_NAME}</span>
+      <span>·</span>
+      <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev'}</span>
+      <span>·</span>
+      <span>{new Date().getFullYear()}</span>
+      <span>·</span>
+      <Link href="/sobre" className="hover:underline">Sobre</Link>
+    </footer>
+  )
+}
+```
+
+**Variáveis de ambiente** (`.env.example`):
+```bash
+NEXT_PUBLIC_APP_NAME=Nome do Sistema
+NEXT_PUBLIC_APP_VERSION=   # CI injeta: $(cat VERSION)
+NEXT_PUBLIC_BUILD_DATE=    # CI injeta: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+NEXT_PUBLIC_GIT_COMMIT=    # CI injeta: $(git rev-parse --short HEAD)
+```
+
+**Página `/sobre`** (pública, sem autenticação):
+```tsx
+// app/sobre/page.tsx
+export default async function SobrePage() {
+  const api = await fetch(`${process.env.BACKEND_URL}/version`)
+    .then(r => r.json()).catch(() => null)
+
+  return (
+    <main className="flex items-center justify-center min-h-screen">
+      <div className="border rounded-lg p-8 max-w-sm w-full space-y-2 text-sm">
+        <h1 className="text-2xl font-semibold mb-4">
+          {process.env.NEXT_PUBLIC_APP_NAME}
+        </h1>
+        {[
+          ['Frontend',  `v${process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev'}`],
+          ['Backend',   api?.backend ?? '–'],
+          ['Build',     process.env.NEXT_PUBLIC_BUILD_DATE ?? '–'],
+          ['Commit',    process.env.NEXT_PUBLIC_GIT_COMMIT ?? '–'],
+        ].map(([label, value]) => (
+          <div key={label} className="flex justify-between">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-mono">{value}</span>
+          </div>
+        ))}
+      </div>
+    </main>
+  )
+}
+```
+
+## Loading por linha no grid (padrão obrigatório)
+
+> Padrão universal em `CLAUDE.md`. Rastrear qual ID está sendo processado,
+> nunca um boolean global — cada linha tem seu próprio estado.
+
+```tsx
+// hooks/use-processos.ts — rastrear ID por operação
+export function useProcessos() {
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingId,  setEditingId]  = useState<string | null>(null)
+
+  async function excluir(id: string) {
+    setDeletingId(id)
+    try {
+      await fetchWithProgress(`/api/v1/processos/${id}`, { method: 'DELETE' })
+      notify.sucesso('Processo excluído')
+      await recarregar()
+    } catch (e) {
+      notify.erro('Erro ao excluir')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  async function abrirEdicao(id: string) {
+    setEditingId(id)
+    // navegação ou carregamento dos dados do item
+    await router.push(`/processos/${id}/editar`)
+    // editingId é limpo pelo NavigationProgress quando a rota completa
+    setEditingId(null)
+  }
+
+  return { deletingId, editingId, excluir, abrirEdicao }
+}
+```
+
+```tsx
+// Linha do grid — botões com LoadingButton por ID
+function ProcessoRow({ row }: { row: Processo }) {
+  const { deletingId, editingId, excluir, abrirEdicao } = useProcessos()
+
+  return (
+    <tr>
+      <td>{row.descricao}</td>
+      <td>
+        <LoadingButton
+          variant="ghost"
+          size="icon"
+          loading={editingId === row.id}
+          loadingText=""     // ícone spinner substitui o ícone de editar
+          aria-label="Editar processo"
+          onClick={() => abrirEdicao(row.id)}
+        >
+          <Pencil className="h-4 w-4" />
+        </LoadingButton>
+
+        <LoadingButton
+          variant="ghost"
+          size="icon"
+          loading={deletingId === row.id}
+          loadingText=""
+          aria-label="Excluir processo"
+          onClick={() => excluir(row.id)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </LoadingButton>
+      </td>
+    </tr>
+  )
+}
+```
+
+O spinner substitui o ícone durante o loading — mesma área, sem
+deslocar o layout da tabela. A barra superior dispara automaticamente
+via `fetchWithProgress` (exclusão) ou `startNavigation` (edição).
+
+## APP_ENV — configuração por ambiente (CSP prático para shadcn/ui)
+
+> Regra universal em `CLAUDE.md`. A configuração abaixo é a que
+> **realmente funciona** com Next.js + Tailwind + Radix/shadcn.
+
+### Por que `style-src 'unsafe-inline'` é necessário e aceitável
+
+Tailwind (via `@layer`), Radix UI e shadcn/ui injetam estilos inline em
+runtime — é parte do funcionamento desses frameworks. Remover
+`'unsafe-inline'` do `style-src` quebra a aplicação completamente.
+
+**Isso é um tradeoff aceitável porque:**
+- CSS injection tem vetor de ataque muito mais restrito que JS injection
+- A proteção que importa é no `script-src` — bloquear JS malicioso
+- O CSP abaixo usa **nonce** para scripts, que é a defesa real contra XSS
+
+### Nonce por requisição — proteção real do script-src
+
+Em vez de `'unsafe-inline'` em scripts (que anula a proteção), usar
+nonce criptográfico gerado por request. O Next.js 14+ suporta isso
+nativamente via middleware:
+
+```typescript
+// middleware.ts (raiz do projeto)
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import crypto from 'crypto'
+
+export function middleware(request: NextRequest) {
+  const isProd = process.env.APP_ENV === 'production'
+
+  if (!isProd) return NextResponse.next()
+
+  // Nonce único por requisição — inviolável mesmo com XSS parcial
+  const nonce = crypto.randomBytes(16).toString('base64')
+
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}'`,   // nonce no lugar de 'unsafe-inline'
+    "style-src 'self' 'unsafe-inline'",     // necessário: Tailwind + Radix injetam estilos em runtime
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ')
+
+  const response = NextResponse.next({
+    request: { headers: new Headers(request.headers) },
+  })
+
+  response.headers.set('Content-Security-Policy', csp)
+  response.headers.set('X-Frame-Options', 'DENY')
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+
+  // Passar o nonce para o layout via header — Next.js lê no server component
+  response.headers.set('x-nonce', nonce)
+
+  return response
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
+```
+
+```typescript
+// app/layout.tsx — ler o nonce e passar para scripts inline
+import { headers } from 'next/headers'
+
+export default async function RootLayout({ children }) {
+  const nonce = (await headers()).get('x-nonce') ?? ''
+
+  return (
+    <html>
+      <body>
+        {children}
+        {/* Scripts inline precisam do nonce — sem ele o CSP bloqueia */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: '' }} />
+      </body>
+    </html>
+  )
+}
+```
+
+```typescript
+// next.config.ts — sem CSP aqui (middleware cuida)
+const isProd = process.env.APP_ENV === 'production'
+
+const nextConfig = {
+  productionBrowserSourceMaps: false,  // source maps só em dev
+
+  // Em dev: sem CSP — não quebrar HMR, DevTools e hot reload
+  // Em prod: CSP via middleware (nonce por request)
+  async headers() {
+    if (isProd) return []  // middleware já seta os headers
+    return [{
+      source: '/(.*)',
+      headers: [
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+      ],
+    }]
+  },
+}
+export default nextConfig
+```
+
+### O que o CSP bloqueia vs. o que aceita
+
+```
+✅ Bloqueia:     JS inline sem nonce (<script>código malicioso</script>)
+✅ Bloqueia:     JS de domínio externo (cdn.atacante.com/xss.js)
+✅ Bloqueia:     iframes de outros domínios (frame-ancestors 'none')
+⚠️ Aceita:      CSS inline (Tailwind/Radix) — tradeoff consciente
+✅ Mitiga CSS:  sem 'unsafe-eval' + headers X-Frame-Options + HSTS
+```
+
+```bash
+# .env.example
+APP_ENV=development
+NEXT_PUBLIC_APP_ENV=development
+```
+
+```typescript
+// components/providers/env-guard.tsx — bloqueio best-effort de DevTools em prod
+'use client'
+import { useEffect } from 'react'
+
+export function EnvGuard() {
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_APP_ENV !== 'production') return
+
+    // Best-effort: detectar DevTools abertos pelo delta de tempo
+    // Não é inviolável — o valor real está nos outros controles de segurança
+    const handler = () => {
+      const start = performance.now()
+      // eslint-disable-next-line no-debugger
+      debugger
+      if (performance.now() - start > 100) {
+        document.body.innerHTML = ''
+      }
+    }
+    const interval = setInterval(handler, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return null
+}
+```
+
+```bash
+# .env.example
+APP_ENV=development
+NEXT_PUBLIC_APP_ENV=development   # versão pública para o componente client-side
+```
+
+Em produção o CI injeta `APP_ENV=production` e `NEXT_PUBLIC_APP_ENV=production`.
+
+## Autenticação — regra de segurança obrigatória
+
+**JWT nunca vai para `localStorage` ou `sessionStorage`.**
+O token é armazenado em cookie `HttpOnly` pelo backend — o frontend
+não toca no token diretamente. O cookie é enviado automaticamente
+pelo browser em cada requisição.
+
+```typescript
+// ❌ PROIBIDO — vulnerável a XSS
+localStorage.setItem('token', jwt)
+const token = localStorage.getItem('token')
+headers: { Authorization: `Bearer ${token}` }
+
+// ✅ CORRETO — cookie HttpOnly gerenciado pelo browser/servidor
+// O frontend não faz nada com o token.
+// O browser envia o cookie automaticamente.
+// O backend lê o JWT do cookie, nunca do header Authorization.
+
+// Login: só chama a API — o backend seta o cookie na resposta
+await fetchWithProgress('/api/auth/login', {
+  method: 'POST',
+  credentials: 'include',   // ← obrigatório para enviar/receber cookies
+  body: JSON.stringify({ email, senha }),
+})
+
+// Todas as requisições autenticadas: credentials: 'include'
+await fetchWithProgress('/api/v1/processos', {
+  credentials: 'include',   // ← cookie enviado automaticamente
+})
+
+// Logout: só chama a API — o backend apaga o cookie
+await fetchWithProgress('/api/auth/logout', {
+  method: 'POST',
+  credentials: 'include',
+})
+```
+
+O `fetchWithProgress` deve sempre incluir `credentials: 'include'`
+nas chamadas autenticadas. O interceptor HTTP automático pode setar
+isso globalmente se toda a aplicação for autenticada.
+
+## LoadingButton — componente obrigatório em shared/ui/
+
+> Padrão universal em `CLAUDE.md`. Todo botão que dispara operação assíncrona
+> usa este componente — nunca `<Button disabled={loading}>` ad-hoc sem visual.
+
+```tsx
+// components/shared/ui/loading-button.tsx
+import { forwardRef } from 'react'
+import { Loader2 } from 'lucide-react'
+import { Button, ButtonProps } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+
+interface LoadingButtonProps extends ButtonProps {
+  loading?: boolean
+  loadingText?: string   // texto no gerúndio: "Salvando...", "Pesquisando..."
+}
+
+const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(
+  ({ loading = false, loadingText, children, disabled, className, ...props }, ref) => (
+    <Button
+      ref={ref}
+      disabled={disabled || loading}
+      className={cn(loading && 'opacity-75', className)}
+      {...props}
+    >
+      {loading && (
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+      )}
+      {loading && loadingText ? loadingText : children}
+    </Button>
+  )
+)
+LoadingButton.displayName = 'LoadingButton'
+export { LoadingButton }
+```
+
+**Uso nos formulários e ações:**
+```tsx
+// Submit de formulário
+<LoadingButton
+  type="submit"
+  loading={isSubmitting}
+  loadingText="Salvando..."
+>
+  Salvar
+</LoadingButton>
+
+// Ação de pesquisa
+<LoadingButton
+  loading={isLoading}
+  loadingText="Pesquisando..."
+  onClick={pesquisar}
+>
+  Pesquisar
+</LoadingButton>
+
+// Ação destrutiva
+<LoadingButton
+  variant="destructive"
+  loading={isDeleting}
+  loadingText="Excluindo..."
+  onClick={() => excluir(id)}
+>
+  Excluir
+</LoadingButton>
+```
+
+**Acessibilidade automática:**
+- `disabled` bloqueia clique e é anunciado por screen readers
+- O spinner tem `aria-hidden="true"` — o texto já comunica o estado
+- Para ações longas, adicionar `aria-live="polite"` no container pai
+
+## Editor de texto rico (WYSIWYG)
+
+> Usar quando `ux.md` indicar campo com editor rico. Regras universais
+> (quando usar, sanitização obrigatória no backend, acessibilidade)
+> em `CLAUDE.md` → "Editor de texto rico".
+
+**Lib:** TipTap (`@tiptap/react`) — acessível, extensível, WAI-ARIA correto.
+Suporta saída em **HTML** ou **Markdown** — definir por feature no `spec.md`.
+
+```bash
+npm install @tiptap/react @tiptap/pm @tiptap/starter-kit \
+            @tiptap/extension-link @tiptap/extension-image \
+            @tiptap/extension-markdown   # saída Markdown (opcional)
+```
+
+```tsx
+// components/shared/forms/rich-text-editor.tsx
+'use client'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Link from '@tiptap/extension-link'
+
+interface RichTextEditorProps {
+  value: string
+  onChange: (html: string) => void
+  outputFormat?: 'html' | 'markdown'   // padrão: html
+  placeholder?: string
+  disabled?: boolean
+}
+
+export function RichTextEditor({
+  value, onChange, outputFormat = 'html', placeholder, disabled
+}: RichTextEditorProps) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Link.configure({ openOnClick: false }),
+    ],
+    content: value,
+    editable: !disabled,
+    onUpdate: ({ editor }) => {
+      const out = outputFormat === 'markdown'
+        ? editor.storage.markdown?.getMarkdown?.() ?? editor.getText()
+        : editor.getHTML()
+      onChange(out)
+    },
+  })
+
+  return (
+    <div className={`border rounded-md ${disabled ? 'opacity-60' : ''}`}>
+      <div className="flex gap-1 border-b p-1 flex-wrap"
+           role="toolbar" aria-label="Formatação de texto">
+        <button type="button" aria-label="Negrito"
+                aria-pressed={editor?.isActive('bold')}
+                onClick={() => editor?.chain().focus().toggleBold().run()}>
+          <strong>B</strong>
+        </button>
+        <button type="button" aria-label="Itálico"
+                aria-pressed={editor?.isActive('italic')}
+                onClick={() => editor?.chain().focus().toggleItalic().run()}>
+          <em>I</em>
+        </button>
+        <button type="button" aria-label="Lista"
+                aria-pressed={editor?.isActive('bulletList')}
+                onClick={() => editor?.chain().focus().toggleBulletList().run()}>
+          ≡
+        </button>
+        <button type="button" aria-label="Lista numerada"
+                aria-pressed={editor?.isActive('orderedList')}
+                onClick={() => editor?.chain().focus().toggleOrderedList().run()}>
+          1.
+        </button>
+      </div>
+      <EditorContent
+        editor={editor}
+        className="p-3 min-h-[120px] prose prose-sm max-w-none"
+        placeholder={placeholder}
+      />
+    </div>
+  )
+}
+```
+
+**Integrar com react-hook-form:**
+```tsx
+<Controller name="descricao" control={control}
+  render={({ field }) =>
+    <RichTextEditor value={field.value} onChange={field.onChange} outputFormat="html" />
+  }
+/>
+```
+
+**O backend sanitiza antes de persistir** — ver `CLAUDE.md` "Editor de texto rico".
+sanitização equivalente no lado do cliente também.
+
+## Skeleton, lazy loading e animações (Framer Motion)
+
+> Padrão universal em `CLAUDE.md`. Implementar em todo componente com conteúdo assíncrono.
+
+```bash
+npm install framer-motion
+```
+
+### Skeleton — componente em shared/ui/
+
+```tsx
+// components/shared/ui/skeleton.tsx
+import { cn } from '@/lib/utils'
+
+export function Skeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn(
+      'animate-pulse rounded-md bg-muted',
+      className
+    )} />
+  )
+}
+
+// Skeleton de linha de tabela — mesma estrutura da linha real
+export function SkeletonTableRow() {
+  return (
+    <tr className="border-b">
+      <td className="p-4"><Skeleton className="h-4 w-48" /></td>
+      <td className="p-4"><Skeleton className="h-4 w-24" /></td>
+      <td className="p-4"><Skeleton className="h-4 w-32" /></td>
+      <td className="p-4">
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <Skeleton className="h-8 w-8 rounded-full" />
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+// Skeleton de card — mesma estrutura do card real
+export function SkeletonCard() {
+  return (
+    <div className="border rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      </div>
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-3/4" />
+    </div>
+  )
+}
+```
+
+### Lazy loading de rotas e componentes pesados
+
+```tsx
+// Rotas: Next.js App Router faz code splitting automaticamente por page.tsx
+
+// Componentes pesados: import dinâmico só quando necessário
+import dynamic from 'next/dynamic'
+
+const MapEditor = dynamic(
+  () => import('@/components/shared/geo/map-editor'),
+  {
+    loading: () => <Skeleton className="h-[400px] w-full rounded-md" />,
+    ssr: false,   // Leaflet não funciona em SSR
+  }
+)
+
+const RichTextEditor = dynamic(
+  () => import('@/components/shared/forms/rich-text-editor'),
+  { loading: () => <Skeleton className="h-48 w-full rounded-md" /> }
+)
+```
+
+### Animações com Framer Motion
+
+```tsx
+// Variantes reutilizáveis — definir uma vez, importar onde precisar
+// lib/animations.ts
+export const fadeIn = {
+  hidden:  { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.2 } },
+  exit:    { opacity: 0, transition: { duration: 0.15 } },
+}
+
+export const slideUp = {
+  hidden:  { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } },
+  exit:    { opacity: 0, y: 8, transition: { duration: 0.15 } },
+}
+
+export const scaleModal = {
+  hidden:  { opacity: 0, scale: 0.95 },
+  visible: { opacity: 1, scale: 1,    transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } },
+  exit:    { opacity: 0, scale: 0.95, transition: { duration: 0.15 } },
+}
+
+export const staggerList = {
+  visible: { transition: { staggerChildren: 0.04 } }  // 40ms entre itens
+}
+```
+
+```tsx
+// Modal com animação
+import { motion, AnimatePresence } from 'framer-motion'
+import { scaleModal, fadeIn } from '@/lib/animations'
+
+export function Modal({ open, children }: { open: boolean; children: React.ReactNode }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            className="fixed inset-0 bg-black/50 z-40"
+            variants={fadeIn} initial="hidden" animate="visible" exit="exit"
+          />
+          {/* Modal */}
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            variants={scaleModal} initial="hidden" animate="visible" exit="exit"
+          >
+            <div className="bg-background rounded-lg p-6 max-w-md w-full shadow-xl">
+              {children}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// Lista com stagger
+import { staggerList, slideUp } from '@/lib/animations'
+
+export function AnimatedList({ items }: { items: Item[] }) {
+  return (
+    <motion.ul variants={staggerList} initial="hidden" animate="visible">
+      {items.map(item => (
+        <motion.li key={item.id} variants={slideUp}>
+          <ItemCard item={item} />
+        </motion.li>
+      ))}
+    </motion.ul>
+  )
+}
+
+// Transição de skeleton → conteúdo
+export function FadeContent({ loading, children }: { loading: boolean; children: React.ReactNode }) {
+  return (
+    <AnimatePresence mode="wait">
+      {loading ? (
+        <motion.div key="skeleton" {...fadeIn}>
+          <SkeletonCard />
+        </motion.div>
+      ) : (
+        <motion.div key="content" variants={slideUp} initial="hidden" animate="visible">
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+```
+
+### Imagens com lazy loading
+
+```tsx
+import Image from 'next/image'
+
+// Next.js Image já faz lazy loading por padrão
+// placeholder="blur" mostra versão borrada enquanto carrega
+<Image
+  src={url}
+  alt={alt}
+  width={400}
+  height={300}
+  placeholder="blur"
+  blurDataURL="data:image/png;base64,..."   // gerar via plaiceholder ou similar
+  className="rounded-md transition-opacity duration-300"
+/>
+```
+
+## Dirty state — proteção contra perda de dados
+
+> Regra universal em `CLAUDE.md`. Aplicar em todo formulário de modal e de página.
+
+```tsx
+// hooks/use-dirty-state.ts
+import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+export function useDirtyState<T extends Record<string, unknown>>(
+  initialValues: T
+) {
+  const [values, setValues]   = useState<T>(initialValues)
+  const [isDirty, setIsDirty] = useState(false)
+  const router = useRouter()
+
+  const setValue = useCallback((key: keyof T, value: unknown) => {
+    setValues(prev => {
+      const next = { ...prev, [key]: value }
+      // Sujo se qualquer campo diferir do valor inicial
+      const dirty = Object.keys(next).some(k => next[k] !== initialValues[k])
+      setIsDirty(dirty)
+      return next as T
+    })
+  }, [initialValues])
+
+  const reset = useCallback(() => {
+    setValues(initialValues)
+    setIsDirty(false)
+  }, [initialValues])
+
+  // Alerta nativo ao recarregar/fechar a aba
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
+  // Bloquear navegação de rota com dados sujos
+  useEffect(() => {
+    if (!isDirty) return
+    // Next.js 14+ App Router — interceptar com push/replace customizado
+    const originalPush = router.push.bind(router)
+    // Usar um signal de bloqueio — solicitar confirmação antes de navegar
+  }, [isDirty, router])
+
+  return { values, setValue, isDirty, reset }
+}
+```
+
+```tsx
+// components/shared/ui/unsaved-changes-dialog.tsx
+import { AlertDialog, AlertDialogAction, AlertDialogCancel,
+         AlertDialogContent, AlertDialogDescription,
+         AlertDialogFooter, AlertDialogHeader, AlertDialogTitle }
+  from '@/components/ui/alert-dialog'
+
+interface UnsavedChangesDialogProps {
+  open: boolean
+  onDiscard: () => void           // "Descartar alterações"
+  onKeepEditing: () => void       // "Continuar editando"
+}
+
+export function UnsavedChangesDialog({
+  open, onDiscard, onKeepEditing
+}: UnsavedChangesDialogProps) {
+  return (
+    <AlertDialog open={open}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Alterações não salvas</AlertDialogTitle>
+          <AlertDialogDescription>
+            Você tem alterações que não foram salvas. Se sair agora, elas serão perdidas.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onKeepEditing}>
+            Continuar editando
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onDiscard}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Descartar alterações
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+```
+
+```tsx
+// Uso em modal
+export function ProcessoModal({ open, onClose }: ModalProps) {
+  const { values, setValue, isDirty, reset } = useDirtyState({ nome: '', status: '' })
+  const [confirmClose, setConfirmClose] = useState(false)
+
+  const handleClose = () => {
+    if (isDirty) {
+      setConfirmClose(true)   // mostrar confirmação
+    } else {
+      onClose()               // fechar direto se não tem dados
+    }
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose() }}>
+        <DialogContent
+          onInteractOutside={(e) => {
+            e.preventDefault()   // impedir fechar ao clicar fora
+            handleClose()        // tratar manualmente com dirty check
+          }}
+          onEscapeKeyDown={(e) => {
+            e.preventDefault()
+            handleClose()
+          }}>
+          {/* campos do formulário */}
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+            <Button onClick={salvar}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <UnsavedChangesDialog
+        open={confirmClose}
+        onDiscard={() => { reset(); setConfirmClose(false); onClose() }}
+        onKeepEditing={() => setConfirmClose(false)}
+      />
+    </>
+  )
+}
+
+// Uso em página de formulário (Novo / Editar)
+export default function ProcessoFormPage() {
+  const { values, setValue, isDirty, reset } = useDirtyState(initialValues)
+  const router = useRouter()
+  const [confirmNav, setConfirmNav] = useState(false)
+
+  const handleCancel = () => {
+    if (isDirty) setConfirmNav(true)
+    else router.back()
+  }
+
+  return (
+    <>
+      {/* formulário */}
+      <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
+
+      <UnsavedChangesDialog
+        open={confirmNav}
+        onDiscard={() => { reset(); router.back() }}
+        onKeepEditing={() => setConfirmNav(false)}
+      />
+    </>
+  )
+}
+```
+
+## Anti-padrões de design — detectar antes de entregar
+
+shadcn/ui é o template mais afetado pelos vícios de "AI slop". Antes de
+considerar qualquer tela entregue, verificar que não há:
+
+```
+❌ Inter como única fonte (vício de AI slop)
+❌ Gradiente roxo-para-azul decorativo
+❌ Texto cinza (#999, #aaa) sobre fundo colorido
+❌ Cards aninhados dentro de outros cards
+❌ Ícone em rounded-square acima de todo heading
+❌ Preto puro — usar tint da cor primária
+❌ Bounce/elastic easing em animações
+❌ Padding menor que 16px em áreas de conteúdo
+```
+
+**Detector automático** (sem API key, roda no CI):
+```bash
+npx impeccable detect src/       # varredura do diretório
+npx impeccable detect --json src/ # saída JSON para CI
+```
+
+60 regras determinísticas — instalar via `npx impeccable install` para
+integração com Claude Code. Repositório: https://github.com/pbakaus/impeccable
+
+## Relação com o UX Designer
+- Testes de integração de componente (ex: Testing Library) > testes
+  unitários isolados de componente puro.
+- `npm run lint` / `npm run build` antes de considerar a tarefa concluída.

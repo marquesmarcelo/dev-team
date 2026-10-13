@@ -285,8 +285,7 @@ eamodio.gitlens
 
 # Frontend
 bradlc.vscode-tailwindcss
-esbenp.prettier-vscode
-dbaeumer.vscode-eslint
+biomejs.biome
 christian-kohler.path-intellisense
 
 # Backend Go
@@ -323,8 +322,7 @@ code --install-extension ms-vscode-remote.remote-wsl
 code --install-extension ms-azuretools.vscode-docker
 code --install-extension eamodio.gitlens
 code --install-extension bradlc.vscode-tailwindcss
-code --install-extension esbenp.prettier-vscode
-code --install-extension dbaeumer.vscode-eslint
+code --install-extension biomejs.biome
 code --install-extension golang.go
 code --install-extension ms-python.python
 code --install-extension vscjava.vscode-java-pack

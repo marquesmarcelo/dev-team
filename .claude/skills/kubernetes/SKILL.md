@@ -312,30 +312,36 @@ stages:
 lint-backend:
   stage: lint
   script:
-    - docker compose run --rm backend <golangci-lint run | flake8 | checkstyle | phpstan>
-  only: [merge_requests, main, staging]
+    - docker compose -f docker-compose.yaml run --rm backend <golangci-lint run | flake8 | checkstyle | phpstan>
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
 
 # ─── Lint + Format frontend (Biome) ─────────────────────────────────────────
 lint-frontend:
   stage: lint
   script:
-    - docker compose run --rm frontend npm run ci:quality   # biome ci .
-  only: [merge_requests, main, staging]
+    - docker compose -f docker-compose.yaml run --rm frontend npm run ci:quality   # biome ci .
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
 
 # ─── Código morto (knip) ────────────────────────────────────────────────────
 knip:
   stage: quality
   script:
-    - docker compose run --rm frontend npx knip
+    - docker compose -f docker-compose.yaml run --rm frontend npx knip
   allow_failure: true   # avisar sem bloquear no início; mudar para false quando limpo
-  only: [main, staging]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
 
 # ─── Contratos arquiteturais (dependency-cruiser) ────────────────────────────
 arch-contract:
   stage: quality
   script:
-    - docker compose run --rm frontend npm run arch:check
-  only: [main, staging]
+    - docker compose -f docker-compose.yaml run --rm frontend npm run arch:check
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
 
 # ─── Testes unitários + smoke ────────────────────────────────────────────────
 test:
@@ -348,19 +354,44 @@ test:
       coverage_report:
         coverage_format: cobertura
         path: coverage/cobertura-coverage.xml
-  only: [merge_requests, main, staging]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
+
+# ─── Testes afetados (opcional) — só roda o que mudou ───────────────────────
+# Alternativa ao job `test` acima; ao adotar estes, remova o `test`.
+# test-backend:
+#   stage: test
+#   rules:
+#     - changes:
+#         - backend/**/*
+#         - go.mod
+#         - go.sum
+#   script:
+#     - cd backend && go test ./...
+#
+# test-frontend:
+#   stage: test
+#   rules:
+#     - changes:
+#         - frontend/**/*
+#         - package.json
+#         - package-lock.json
+#   script:
+#     - cd frontend && npx vitest run --changed origin/main
 
 # ─── E2E / Hardening (manual — acionado pelo dono do produto) ────────────────
 e2e-hardening:
   stage: test
-  when: manual          # nunca automático — "rode os testes E2E" para acionar
   script:
-    - docker compose run --rm playwright npx playwright test
+    - docker compose -f docker-compose.yaml run --rm playwright npx playwright test
   artifacts:
     when: always
     paths: [playwright-report/]
     expire_in: 7 days
-  only: [main, staging]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
+      when: manual          # nunca automático — "rode os testes E2E" para acionar
 
 # ─── SonarQube ──────────────────────────────────────────────────────────────
 sonarqube:
@@ -372,7 +403,8 @@ sonarqube:
   script:
     - sonar-scanner
   allow_failure: false   # Quality Gate bloqueia o pipeline se falhar
-  only: [main, staging]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
 
 # ─── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -380,15 +412,17 @@ build:
   script:
     - docker build -t ${IMAGE_BACKEND}:${CI_COMMIT_SHA} ./backend
     - docker build -t ${IMAGE_FRONTEND}:${CI_COMMIT_SHA} ./frontend
-  only: [main, staging]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
 
 # ─── Segurança de dependências ───────────────────────────────────────────────
 security-scan:
   stage: security
   script:
-    - docker compose run --rm backend <govulncheck ou npm audit>
+    - docker compose -f docker-compose.yaml run --rm backend <govulncheck ou npm audit>
   allow_failure: false
-  only: [main, staging]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
 
 # ─── Push para Harbor ────────────────────────────────────────────────────────
 push:
@@ -399,7 +433,8 @@ push:
     - docker push ${IMAGE_FRONTEND}:${CI_COMMIT_SHA}
     - docker tag ${IMAGE_BACKEND}:${CI_COMMIT_SHA} ${IMAGE_BACKEND}:latest
     - docker push ${IMAGE_BACKEND}:latest
-  only: [main, staging]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
 
 # ─── Deploy dev (GitOps: atualiza tag no Git → ArgoCD sincroniza) ────────────
 deploy-dev:
@@ -420,7 +455,8 @@ deploy-dev:
   environment:
     name: development
     url: https://${ENV_DEV}.${PROJECT_NAME}.empresa.com
-  only: [main]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
 
 # ─── Deploy staging ──────────────────────────────────────────────────────────
 deploy-staging:
@@ -436,12 +472,12 @@ deploy-staging:
   environment:
     name: staging
     url: https://${ENV_STAGING}.${PROJECT_NAME}.empresa.com
-  only: [main]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
 
 # ─── Deploy prod (manual — botão no GitLab ou sync no ArgoCD) ────────────────
 deploy-prod:
   stage: deploy-prod
-  when: manual                 # nunca automático em produção
   script:
     - |
       sed -i "s/newTag:.*/newTag: ${CI_COMMIT_SHA}/" \
@@ -455,7 +491,9 @@ deploy-prod:
   environment:
     name: production
     url: https://${PROJECT_NAME}.empresa.com
-  only: [main]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual          # nunca automático em produção
 ```
 
 ---

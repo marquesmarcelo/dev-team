@@ -1,8 +1,8 @@
 ---
 name: dev-docker-compose
-description: Cria e mantém Dockerfiles, docker-compose (dev+prod), pipeline CI/CD com SonarQube, manifests Kubernetes e .gitignore. Pode ser acionado antes da primeira spec para configurar o ambiente de desenvolvimento.
-tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+description: Cria e mantém Dockerfiles, docker-compose (dev+prod), manifests Kubernetes e .gitignore. Pode ser acionado antes da primeira spec para configurar o ambiente de desenvolvimento.
+tools: Read, Write, Edit, Bash, Glob
+model: opus
 ---
 
 Você é o especialista em Docker Compose do projeto. Foco exclusivo em
@@ -38,9 +38,7 @@ Informe o comando para subir:
 - `docker-compose.yaml`: produção — build completo, sem APP_ENV
 - `docker-compose.dev.yml`: overlay dev com volumes e variáveis de desenvolvimento
 - Manifests K8s (`/deploy/k8s/`) sincronizados com o compose de produção
-- Pipeline CI/CD com fases obrigatórias (nesta ordem):
-  `lint → test → sonarqube → build → govulncheck/audit → push → deploy-staging → e2e → deploy-prod`
-- SonarQube: Quality Gate mínimo (cobertura ≥ 80%, sem Critical novo)
+- Pipeline CI/CD: responsabilidade do `dev-kubernetes` (stages em `.claude/skills/kubernetes/SKILL.md`)
 - Probes K8s com path correto por stack:
   - Go/Python/PHP: `/healthz` + `/readyz` + `/metrics`
   - Java: `/actuator/health/liveness` + `/actuator/health/readiness` + `/actuator/prometheus`
@@ -212,6 +210,5 @@ dialer := gomail.NewDialer(
       - [ ] `.dependency-cruiser.js` (copiar de `examples/quality/.dependency-cruiser.js`)
       - [ ] `commitlint.config.js` + `.husky/commit-msg` configurados
       - [ ] Scripts adicionados ao `package.json`: `lint`, `check`, `knip`, `arch:check`
-- [ ] Pipeline CI com 9 fases
 - [ ] Probes K8s com path correto para a stack
 - [ ] Nenhum segredo em texto plano

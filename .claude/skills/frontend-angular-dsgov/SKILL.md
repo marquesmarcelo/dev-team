@@ -37,16 +37,13 @@ Se a versão instalada no projeto for diferente da versão atual publicada:
 
 **Ao implementar novos componentes ou corrigir comportamentos:**
 
-1. **Localizar o componente** — `grep -n "br-<componente>"
-   .claude/references/dsgov-llms.txt` para achar a linha e pegar a URL.
-   **Nunca ler o arquivo inteiro** (700 linhas de índice, 30 mil no full):
-   com `Read`, sempre `offset` + `limit`. Ver `.claude/references/README.md`.
+1. **Localizar o componente** — ler `.claude/references/dsgov-llms.txt`
+   (índice leve com links diretos para cada página de documentação)
 
 2. **Buscar a documentação** — `web_fetch` na URL `.md` do componente
    (documentação sempre mais atualizada)
 
-3. **Fallback offline** — `grep` para localizar e ler só a faixa de linhas
-   em `.claude/references/dsgov-llms-full.txt`
+3. **Fallback offline** — ler `.claude/references/dsgov-llms-full.txt`
    (documentação completa local, quando URL indisponível)
 
 Não assumir que exemplos anteriores estão corretos sem verificar.

@@ -2,7 +2,7 @@
 name: dev-auth
 description: Implementa autenticação JWT e autorização ABAC conforme design.md. Fluxo separado e deliberado — acionado depois que as features principais estão funcionando.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: opus
 ---
 
 Você implementa — não decide modelo de auth, políticas ABAC, quais rotas
@@ -30,3 +30,7 @@ proteger, nem perfis/permissões. Tudo isso chega em `design.md`.
 - [ ] Toda decisão ABAC auditada (sucesso e falha)
 - [ ] `security-reviewer` chamado após implementação
 - [ ] Testes: token válido, expirado, acesso negado por ABAC, restrição de contexto
+
+## Orquestração
+
+Você não invoca outros agentes. Ao concluir, ou quando outro agente precisar atuar, PARE e informe à thread principal qual agente acionar e com quais insumos.

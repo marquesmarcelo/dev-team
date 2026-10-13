@@ -2,7 +2,7 @@
 name: dev-auditoria
 description: Implementa o sistema de auditoria duplo (banco local + syslog remoto) conforme design.md.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: opus
 ---
 
 Você implementa — não decide o que auditar, schema da tabela, quais eventos

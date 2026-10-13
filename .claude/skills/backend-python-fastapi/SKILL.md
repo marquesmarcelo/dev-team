@@ -9,6 +9,8 @@ description: Use ao implementar backend em Python com FastAPI, quando project.co
 
 ## Estrutura de pastas
 
+> **SOLID e Clean Code são não-negociáveis.** DIP já está expresso nas portas e adaptadores (hexagonal). Mantenha SRP: cada classe tem uma responsabilidade. Nomes de métodos devem ser autoexplicativos — prefira verbos longos a abreviações.
+
 ```
 app/
   domain/
@@ -101,12 +103,17 @@ class StatusProcesso(str, Enum):
 # adapter/http/processo_router.py
 from fastapi import APIRouter, Depends
 from app.port.processo_repository import ProcessoRepository
-from app.adapter.sqlalchemy.processo_repository import SQLAlchemyProcessoRepository
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+from app.adapter.sqlalchemy.processo_repository import ProcessoSqlRepository
 
 router = APIRouter(prefix="/api/v1/processos")
 
-def get_repository() -> ProcessoRepository:
-    return SQLAlchemyProcessoRepository()  # substituível por mock em testes
+async def get_conn(engine: AsyncEngine = Depends(get_engine)):
+    async with engine.connect() as conn:
+        yield conn
+
+def get_repository(conn: AsyncConnection = Depends(get_conn)) -> ProcessoRepository:
+    return ProcessoSqlRepository(conn)  # substituível por mock em testes
 
 @router.post("/", status_code=201)
 async def criar(
@@ -117,16 +124,67 @@ async def criar(
     return await use_case.executar(body.to_command())
 ```
 
-## Acesso a dados: SQLAlchemy async + SQL customizado
+## Persistência com SQLAlchemy Core (sem ORM)
+
+Dependências: `sqlalchemy[asyncio]` e `asyncpg`. Usar SQLAlchemy **Core**
+(SQL Expression Language) — nunca o ORM declarativo (`declarative_base`,
+`Session`, `query()`, `relationship()`, `backref`).
+
+```python
+# infrastructure/database.py
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncConnection
+from sqlalchemy import Table, Column, String, DateTime, MetaData
+
+metadata = MetaData()
+
+processos = Table(
+    "processos", metadata,
+    Column("id", String, primary_key=True),
+    Column("numero", String, nullable=False),
+    Column("status", String, nullable=False),
+    Column("criado_em", DateTime(timezone=True), nullable=False),
+)
+```
+
+```python
+# adapter/sqlalchemy/processo_repository.py
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+class ProcessoSqlRepository(ProcessoRepository):
+    def __init__(self, conn: AsyncConnection):
+        self._conn = conn
+
+    async def find_by_id(self, id: str) -> Processo | None:
+        result = await self._conn.execute(
+            processos.select().where(processos.c.id == id)
+        )
+        row = result.fetchone()
+        return ProcessoMapper.to_domain(row) if row else None
+
+    async def save(self, processo: Processo) -> None:
+        # on_conflict_do_update só existe no insert do dialeto PostgreSQL
+        await self._conn.execute(
+            pg_insert(processos)
+            .values(ProcessoMapper.to_persistence(processo))
+            .on_conflict_do_update(
+                index_elements=["id"],
+                set_=ProcessoMapper.to_persistence(processo),
+            )
+        )
+```
+
+Listagem com paginação e ordenação:
 
 ```python
 # adapter/sqlalchemy/processo_repository.py
 COLUNAS_ORDENAVEIS = {"criado_em", "descricao", "status"}
 
 async def listar(self, page, page_size, sort, order):
-    coluna = sort if sort in COLUNAS_ORDENAVEIS else "criado_em"
+    if sort and sort not in COLUNAS_ORDENAVEIS:
+        raise HTTPException(status_code=400, detail=f"Ordenação inválida: {sort}")
+    coluna = sort or "criado_em"
     ordem = "DESC" if order == "desc" else "ASC"
-    resultado = await self._session.execute(
+    resultado = await self._conn.execute(
         text(f"SELECT ... FROM processo WHERE excluido_em IS NULL "
              f"ORDER BY {coluna} {ordem} LIMIT :limit OFFSET :offset"),
         {"limit": page_size, "offset": (page - 1) * page_size},
@@ -198,10 +256,10 @@ async def healthz():
     return {"status": "ok"}
 
 @app.get("/readyz", tags=["health"], include_in_schema=False)
-async def readyz(db: AsyncSession = Depends(get_db)):
+async def readyz(conn: AsyncConnection = Depends(get_conn)):
     """Readiness probe — dependências (banco, Redis) estão acessíveis."""
     try:
-        await db.execute(text("SELECT 1"))
+        await conn.execute(text("SELECT 1"))
         return {"status": "ok"}
     except Exception:
         raise HTTPException(status_code=503, detail="banco indisponível")

@@ -107,6 +107,22 @@ Critérios de sucesso fortes permitem que o agente itere de forma
 independente com mínima interação. Critérios fracos ("faça funcionar")
 exigem clarificação constante.
 
+## Princípios de código
+
+**SOLID** — obrigatório em toda classe e módulo:
+- **S** — Single Responsibility: uma classe, uma razão para mudar
+- **O** — Open/Closed: aberto para extensão, fechado para modificação
+- **L** — Liskov Substitution: subtipos substituem o tipo base sem quebrar o comportamento
+- **I** — Interface Segregation: interfaces pequenas e coesas — nenhum cliente depende de método que não usa
+- **D** — Dependency Inversion: dependa de abstrações, nunca de implementações concretas
+
+**Clean Code** — obrigatório em todo código produzido:
+- Nomes expressivos e longos quando necessário — `calcularTotalComImpostos()` > `calc()`
+- Funções fazem uma coisa só e têm no máximo 20 linhas
+- Sem comentários que explicam o que o código já diz — código é a documentação
+- Sem números mágicos — use constantes com nome
+- Regra do escoteiro: deixe o código mais limpo do que encontrou
+
 ---
 ## 5. Comentários no código-fonte
 
@@ -226,6 +242,8 @@ Note right of FE: esqueleto enquanto carrega
 - **State Mermaid:** ciclo de vida de uma entidade com múltiplos estados
 
 
+
+## 8. Não assuma. Não esconda confusão
 
 **Não assuma. Não esconda confusão. Mostre os tradeoffs.**
 
@@ -456,12 +474,13 @@ técnica específica fica nas skills; as regras e o contrato são definidos aqui
 | `/metrics` (ou equivalente da stack) | Scrape do Prometheus — métricas técnicas e de negócio | Primeiro endpoint da aplicação |
 | `/healthz` (ou equivalente) | **Liveness probe** — o processo está vivo? | Junto com `/metrics` |
 | `/readyz` (ou equivalente) | **Readiness probe** — as dependências (banco, Redis, fila) estão acessíveis? | Junto com `/metrics` |
+| `/version` | `GET /version → { app, version, buildDate, commit }` | Primeira feature (lê do arquivo `VERSION`), não na Fase Release |
 
 **"Equivalente da stack"** significa que Java usa `/actuator/prometheus`,
 `/actuator/health/liveness` e `/actuator/health/readiness` — o `dev-docker-compose`
 conhece o caminho correto para cada stack e configura o scrape do Prometheus
 e os probes do Kubernetes adequadamente. O que nunca muda é a obrigação
-de expor os três, independentemente do caminho.
+de expor os quatro, independentemente do caminho.
 
 ### Métricas mínimas obrigatórias
 
@@ -660,63 +679,6 @@ sem exceção:
   modificação, nunca via trigger de banco silenciosa
 - `excluido_em TIMESTAMPTZ` — nulo enquanto o registro está ativo (ver
   regra de deleção lógica abaixo)
-- `versao INT NOT NULL DEFAULT 1` — token de concorrência otimista (ver
-  regra abaixo). Toda entidade editável por mais de um usuário nasce com
-  este campo.
-
-## Concorrência otimista (regra inegociável em entidade editável)
-
-Dois usuários abrem o mesmo registro. O primeiro salva. O segundo salva
-trinta segundos depois e sobrescreve tudo, sem aviso para ninguém. O
-primeiro só descobre quando reabre a tela. Em sistema de gestão com vários
-usuários isso aparece na primeira semana de produção, e o dado perdido não
-volta.
-
-A solução adotada é **lock otimista com número de versão**. Não usamos lock
-pessimista (`SELECT FOR UPDATE` segurando transação entre requisições), que
-é incompatível com API stateless e derruba a aplicação quando o usuário
-abandona a tela com o registro travado.
-
-### Como funciona
-
-```
-1. GET /api/v1/processos/{id}     → response inclui "versao": 3
-2. usuário edita na tela
-3. PUT /api/v1/processos/{id}     → request inclui "versao": 3
-4. UPDATE ... WHERE id = $1 AND versao = 3
-   → 1 linha afetada:  sucesso, grava versao = 4
-   → 0 linhas afetadas: outro usuário já alterou → 409 Conflict
-```
-
-O `UPDATE` condicional resolve a corrida no próprio banco, sem transação
-longa e sem estado no processo.
-
-```sql
-UPDATE processo
-   SET descricao = $2, versao = versao + 1, atualizado_em = now()
- WHERE id = $1 AND versao = $3 AND excluido_em IS NULL;
--- rows affected = 0 → conflito de concorrência
-```
-
-### Regras
-
-- **Backend:** o use case de comando recebe a versão junto com os dados e
-  devolve erro de domínio `ErrConflitoDeVersao` quando o `UPDATE` afeta
-  zero linhas. O handler traduz para **HTTP 409**, nunca 400 nem 500.
-- **Contrato de API:** `versao` é campo obrigatório no request de `PUT`/
-  `PATCH` e sempre presente na response de `GET`. O `arquiteto` registra
-  isso no contrato em `design.md`.
-- **Frontend:** o 409 tem tratamento próprio, distinto do erro genérico.
-  Mensagem: "Este registro foi alterado por outro usuário enquanto você
-  editava." Ação oferecida: recarregar os dados atuais. Nunca salvar por
-  cima automaticamente, nunca engolir o erro.
-- **Quando não se aplica:** entidade escrita por um único processo (log,
-  auditoria, outbox) e tabela de referência somente-leitura. Registrar a
-  exceção em `design.md` com o motivo.
-- **Alternativa aceita:** usar `atualizado_em` como token em vez de
-  `versao`, quando a entidade já existe em produção sem a coluna. Menos
-  robusto (duas escritas no mesmo instante colidem), então só para
-  retrofit.
 
 ## Deleção lógica (regra inegociável, sem exceção)
 
@@ -757,7 +719,88 @@ linha, e o dado permanece no banco.
   pgvector, já adotado — Postgres permite combinar busca textual e
   semântica na mesma query quando fizer sentido (busca híbrida).
 
-## Layout padrão da aplicação (scaffolding único, no início do projeto)
+## Layout da área de conteúdo — alinhamento e responsividade
+
+### Posicionamento do conteúdo
+
+**A área de conteúdo fica à esquerda, ao lado do menu lateral — nunca centralizada.**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Header                                                      │
+├─────────────┬───────────────────────────────────────────────┤
+│             │ Breadcrumb                                     │
+│   Menu      │ Título da página                               │
+│   Lateral   │                                                │
+│             │ [Conteúdo ocupa TODO o espaço disponível →]   │
+│   (240px)   │                                                │
+│             │                                                │
+└─────────────┴───────────────────────────────────────────────┘
+```
+
+## Estrutura de UI obrigatória (AppShell)
+
+O conteúdo **não tem `max-width` restritivo centralizado** — ocupa o
+espaço útil à direita do menu. Componentes como tabelas, formulários,
+grids e cards expandem para preencher o espaço disponível.
+
+```css
+/* Estrutura base do AppShell */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.app-body {
+  display: flex;
+  flex: 1;
+}
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;            /* nunca encolhe */
+}
+.main-content {
+  flex: 1;                   /* ocupa TODO o espaço restante */
+  min-width: 0;              /* evita overflow em flex */
+  padding: 1.5rem;
+  overflow-x: auto;          /* scroll horizontal só quando necessário */
+}
+```
+
+### Componentes devem consumir o espaço útil
+
+```
+✅ Tabela ocupa 100% da largura do main-content
+✅ Formulário usa duas colunas em desktop, uma em mobile
+✅ Cards em grid: repeat(auto-fill, minmax(280px, 1fr))
+✅ Gráficos com ResponsiveContainer width="100%"
+
+❌ Tabela com largura fixa (ex: max-w-2xl centralizado)
+❌ Formulário em coluna única estreita com muito espaço vazio ao lado
+❌ Cards sempre em linha única independente do espaço disponível
+```
+
+### Responsividade — sidebar em mobile
+
+Em telas menores que `lg` (1024px): sidebar some e é acessível via
+hamburguer no header. O `main-content` ocupa 100% da largura.
+
+```tsx
+// Tailwind — padrão de layout responsivo
+<div className="flex min-h-screen">
+  {/* Sidebar: oculta em mobile, visível em desktop */}
+  <aside className="hidden lg:flex lg:w-60 lg:flex-shrink-0 ...">
+    {/* menu */}
+  </aside>
+
+  {/* Conteúdo: 100% em mobile, restante em desktop */}
+  <main className="flex-1 min-w-0 p-4 lg:p-6">
+    {children}
+  </main>
+</div>
+```
+
+
 
 Toda aplicação nasce com esta estrutura de UI, criada como tarefa de
 infraestrutura na primeira funcionalidade do projeto (o `arquiteto`
@@ -804,61 +847,6 @@ ainda não existe):
   - **Sistema de toast:** `Toaster`/`SnackBar` registrado globalmente no
     root, com wrapper `notify.sucesso()`, `notify.erro()`, `notify.aviso()`,
     `notify.info()` disponível para toda a aplicação
-
-### Área de conteúdo — alinhada à esquerda, ocupando o espaço útil
-
-**Regra inegociável:** a área de conteúdo começa colada ao menu lateral e
-se estende até a margem direita da janela. Nunca centralizar o conteúdo em
-uma coluna estreita no meio da tela — isso desperdiça o espaço à direita e
-cria um vão visual entre o menu e o conteúdo.
-
-```
-❌ Errado — conteúdo centralizado, com vão à esquerda e sobra à direita
-┌────────┬──────────────────────────────────────────────────┐
-│ Menu   │            ┌──────────────────┐                  │
-│        │            │   conteúdo       │                  │
-│        │            └──────────────────┘                  │
-└────────┴──────────────────────────────────────────────────┘
-
-✅ Correto — conteúdo alinhado à esquerda, ocupando a largura disponível
-┌────────┬──────────────────────────────────────────────────┐
-│ Menu   │ ┌──────────────────────────────────────────────┐ │
-│        │ │ conteúdo                                     │ │
-│        │ └──────────────────────────────────────────────┘ │
-└────────┴──────────────────────────────────────────────────┘
-```
-
-**Como implementar:**
-
-- O container da área de conteúdo usa `w-full` com padding interno
-  (`px-4 md:px-6`) — nunca `mx-auto` combinado com `max-w-*` no wrapper
-  de página.
-- `max-w-*` continua válido para **blocos de texto corrido** (documentação,
-  termos de uso, página `/sobre`), onde linha longa demais prejudica a
-  leitura. Para grid, formulário, dashboard e detalhe de registro: largura
-  total.
-- Elementos internos herdam esse alinhamento: título, breadcrumb, barra de
-  filtros, tabela e paginação começam todos na mesma margem esquerda.
-- `text-align: center` só em célula de tabela com valor numérico curto,
-  em estado vazio e em tela de login. Em qualquer outro lugar é exceção
-  que precisa de motivo.
-
-**Componentes consomem o espaço útil, não uma fatia fixa dele:**
-
-- Tabela: `w-full`, com as colunas distribuídas por proporção. Coluna de
-  ações com largura fixa mínima; as demais crescem.
-- Formulário: grid responsivo de colunas (`grid-cols-1 md:grid-cols-2
-  xl:grid-cols-3`) em vez de campos empilhados em coluna única no desktop.
-  Campo de texto longo e editor rico ocupam a linha inteira (`col-span-full`).
-- Cards e painéis de dashboard: grid que reflui com a largura, nunca
-  quantidade fixa de colunas.
-- Barra de filtros: campos lado a lado enquanto couberem, quebrando em
-  linhas conforme a tela diminui.
-
-O resultado tem que ser um layout que respira: usa a largura disponível
-sem esticar um campo de CPF por 1400px. Quando um controle ficaria absurdo
-em largura total, ele ganha `max-w-*` **no próprio controle** — não no
-container da página.
 
 ### Estrutura de componentes do AppShell
 
@@ -1017,6 +1005,7 @@ A implementação concreta (Framer Motion / Next.js, @angular/animations) vem da
 **1. Estrutura da tela de listagem**
 - A tela começa mostrando a **área de filtro** — sempre visível, sempre no
   topo.
+  O `ux-designer` pergunta ao dono do produto quais campos filtrar.
 - O grid de resultados **não aparece até o usuário clicar em "Pesquisar"**.
   A tela não executa nenhuma consulta ao carregar. Isso é comportamento
   esperado, não limitação técnica.
@@ -1040,13 +1029,15 @@ Tudo o que o usuário configurou na tela é **salvo no armazenamento local do
 navegador** (localStorage ou equivalente) e **restaurado automaticamente**
 quando ele retorna à tela — sem precisar reconfigurar:
 
-| O que persiste | Restaurado quando |
-|---|---|
-| Valores dos campos de filtro | Ao abrir a tela novamente |
-| Coluna de ordenação ativa | Ao abrir a tela novamente |
-| Direção (crescente/decrescente) | Ao abrir a tela novamente |
-| Tamanho de página escolhido | Ao abrir a tela novamente |
-| Número da página atual | Ao abrir a tela* |
+| O que persiste | Chave sugerida | Restaurado quando |
+|---|---|---|
+| Valores dos campos de filtro | `grid-state:<entidade>:filtros` | Ao abrir a tela novamente |
+| Coluna de ordenação ativa | `grid-state:<entidade>:sort` | Ao abrir a tela novamente |
+| Direção (asc/desc) | `grid-state:<entidade>:order` | Ao abrir a tela novamente |
+| Tamanho de página escolhido | `grid-state:<entidade>:pageSize` | Ao abrir a tela novamente |
+| Número da página atual | `grid-state:<entidade>:page` | Ao abrir a tela* |
+
+**Quando salvar:** a cada alteração, imediatamente. **Quando restaurar:** ao montar o componente da tela.
 
 *Se o total de resultados for menor que a página salva, ir para a última
 página válida.
@@ -1172,16 +1163,8 @@ Todo sistema deve funcionar em **celular, tablet e desktop**. A abordagem
 - **Botões de ação:** em `sm`, apenas ícone; em `md`+, ícone + texto
 - **Modais:** ver regras abaixo
 
-**Não usar `px` fixo para larguras de container** — usar unidades relativas
-(`w-full`, `flex-1`, `grid` com frações) para que o container acompanhe a
-largura disponível em qualquer tela. `max-w-*` é aplicado ao controle
-individual quando ele ficaria largo demais, nunca ao wrapper da página —
-ver "Área de conteúdo — alinhada à esquerda, ocupando o espaço útil".
-
-**Toda tela é verificada em três larguras antes de ser dada como pronta:**
-360px (celular), 768px (tablet) e 1440px (desktop). Em nenhuma delas pode
-haver scroll horizontal, texto cortado ou faixa vazia de mais de ~15% da
-largura à direita do conteúdo.
+**Não usar `px` fixo para larguras de container** — usar `max-w-*` com `w-full`
+para que o container ocupe a tela toda em mobile e tenha limite em desktop.
 
 ---
 
@@ -1424,46 +1407,7 @@ HTML é um vetor de XSS se não for sanitizado. Regras inegociáveis:
 
 ## Padrão de CRUD: filtro + grid (comportamento completo)
 
-Toda tela de listagem de uma entidade segue esta estrutura:
-
-### Estrutura da tela (sequência obrigatória)
-
-1. **Área de filtro** no topo — sempre presente, sempre visível.
-   O `ux-designer` pergunta ao dono do produto quais campos filtrar.
-   Os filtros começam **pré-preenchidos** com os valores da última pesquisa
-   (restaurados do localStorage ao carregar a tela).
-
-2. **Botão "Pesquisar"** aciona a consulta e popula o grid.
-   O grid **só aparece após clicar em Pesquisar** — a tela não executa
-   consulta automática ao carregar, evitando busca desnecessária e
-   permitindo que o usuário ajuste os filtros antes.
-
-3. **Grid de resultados** com paginação e ordenação:
-   - Cabeçalhos de coluna clicáveis (1º clique = crescente, 2º = decrescente)
-   - Controle de paginação visível
-   - Cada linha tem botões **Editar** e **Excluir**
-
-4. **Botão "Novo"** sempre visível na tela, abre o formulário de criação.
-
-### Estado persistido no localStorage (por tela, por funcionalidade)
-
-**Tudo que o usuário configura** na tela é salvo e restaurado:
-
-| O que salvar | Chave sugerida | Restaurado quando |
-|---|---|---|
-| Valores dos campos de filtro | `grid-state:<entidade>:filtros` | Ao retornar à tela |
-| Coluna de ordenação ativa | `grid-state:<entidade>:sort` | Ao retornar à tela |
-| Direção (asc/desc) | `grid-state:<entidade>:order` | Ao retornar à tela |
-| Tamanho de página escolhido | `grid-state:<entidade>:pageSize` | Ao retornar à tela |
-| Página atual | `grid-state:<entidade>:page` | Ao retornar à tela* |
-
-*A página é restaurada, mas se o total de resultados for menor (filtro
-mudou), clampar para a última página válida.
-
-**Quando salvar:** a cada alteração de qualquer desses valores, imediatamente.
-**Quando restaurar:** ao montar o componente da tela.
-**O que NÃO salvar:** o resultado do grid em si (sempre refetched ao
-abrir a tela com os filtros restaurados, garantindo dados atualizados).
+> Ver seção "Grid/listagem: comportamento obrigatório" neste arquivo.
 
 ### Formulário de criação/edição: independente de contêiner
 
@@ -1535,10 +1479,6 @@ isso e entrega resultado de qualidade inferior.
 | Teste de carga | `load-tester` |
 | Gerar documentação e OpenAPI | `tech-writer` |
 | Auditar projeto existente | `auditor-projeto` |
-| Migração de dados / backfill em tabela grande | `dba` (Modo 3) |
-| Coordenar rollback ou incidente em produção | `arquiteto` |
-| Varredura de dependência vulnerável | `security-reviewer` |
-| Executar bump de dependência | `dev-fullstack` (após decisão do arquiteto) |
 
 **Quando um agente encontrar algo que não sabe:**
 O agente especializado pode e deve buscar informação adicional — pesquisar
@@ -1546,7 +1486,21 @@ na web, ler arquivos do projeto, perguntar ao usuário — **mas continua
 sendo o agente especializado executando a tarefa**. Nunca transferir a
 execução para um agente genérico.
 
+## Distribuição de modelos por agente
+
+| Modelo | Agentes |
+|---|---|
+| fable | arquiteto-revisor, code-reviewer |
+| opus  | arquiteto, analista-requisitos, ux-designer, dev-fullstack, dev-auth, dev-mcp, dev-ia, dev-auditoria, dev-docker-compose, dev-kubernetes, dba, qa-tester, load-tester, tech-writer, security-reviewer, auditor-projeto, ai-consultor |
+| haiku | (nenhum — reservado para futuras tarefas de pesquisa) |
+
+O modelo está fixado no frontmatter de cada agente. O `arquiteto` (opus)
+produz o rascunho de design.md e tasks.md; a crítica do design completo é
+feita pelo `arquiteto-revisor` (fable), acionado pela thread principal.
+
 ## Orquestração dos subagents (papel da thread principal)
+
+**Regra de orquestração:** nenhum agente invoca outro diretamente. Toda transição de agente passa pela thread principal. Quando um agente escreve "acione X" ou "coordene Y", isso significa: PARE e informe à thread principal que X deve ser acionado com estes insumos. A thread principal é quem dispara todos os subagentes.
 
 ### Modelo preferido: dev-fullstack por funcionalidade
 
@@ -1560,18 +1514,10 @@ feature-B → dev-fullstack
 feature-C → dev-fullstack
 ```
 
-### Quando um especialista entra no lugar do dev-fullstack
-
-O `dev-fullstack` cobre qualquer feature — com tela, sem tela, só backend
-(job, worker, webhook) ou só ajuste de UI. Os agentes abaixo têm fluxo
-dedicado e são acionados fora do ciclo padrão de feature:
-
-| Situação | Agente |
-|---|---|
-| Integração com LLM aprovada em `oportunidades-ia.md` | `dev-ia` |
-| Autenticação JWT e engine ABAC | `dev-auth` |
-| Sistema de auditoria dual-channel | `dev-auditoria` |
-| Servidor MCP que expõe a API como tools | `dev-mcp` |
+### Escopo do dev-fullstack
+- Também cobre feature puramente de backend sem tela (job, worker, webhook)
+  e refatoração de UI sem mudança de API
+- Especialistas mantêm fluxo dedicado: `dev-ia`, `dev-auth`, `dev-auditoria`, `dev-mcp`
 
 ### Estratégia de testes — três camadas com custos diferentes
 
@@ -1583,7 +1529,7 @@ CAMADA 1 — Build contínuo (sempre, em cada PR)
 
 CAMADA 2 — Fase de Release (junto com code review e security review)
   `dev-fullstack` escreve os testes E2E dos fluxos críticos da release
-  `qa-tester` executa a suíte E2E completa
+  `qa-tester` executa a suíte completa (nunca affected-only)
   → Acionada quando o usuário declara que vai lançar a versão
   → E2E é escrito uma vez por release, não por feature
 
@@ -1613,7 +1559,7 @@ Registrar justificativa no `spec.md`.
 
 ### Sequencial obrigatório
 ```
-analista-requisitos → ux-designer → arquiteto → dev-fullstack(s)
+analista-requisitos → ux-designer → arquiteto → arquiteto-revisor → dev-fullstack(s)
         ↓
 ⛔ PARE — usuário testa manualmente (smoke manual do happy path)
         ↓ (usuário aprova)
@@ -1623,7 +1569,7 @@ qa-tester → unit + smoke → evidence.md
         ↓
 ⛔ PARE — aprovação final do usuário
         ↓
-tech-writer → devops
+tech-writer → dev-kubernetes (deploy/CI)
 
 ─── Fase de Release (ao declarar versão estável) ────────────
 dev-fullstack escreve testes E2E dos fluxos críticos da release
@@ -1638,6 +1584,36 @@ Revisões de código que vai ser reescrito são desperdício.
 ### Paralelizável
 - Múltiplos `dev-fullstack` para features independentes
 - `security-reviewer` e `code-reviewer` entre si (depois da validação do usuário)
+
+## Testes afetados — só rodar o que mudou (Camada 1)
+
+Em PR que toca apenas um módulo/pacote, não há motivo para rodar toda a suíte.
+Use as variantes abaixo por stack — o CI usa `rules: changes:` para o mesmo efeito.
+
+**Go:**
+```bash
+CHANGED=$(git diff --name-only origin/main...HEAD | grep '\.go$' | xargs -I{} dirname {} | sort -u)
+[ -n "$CHANGED" ] && go test $(echo "$CHANGED" | sed 's|^|./|;s|$|/...|') || echo "sem arquivos Go alterados"
+```
+
+**TypeScript/JavaScript (Vitest):**
+```bash
+npx vitest run --changed origin/main
+```
+
+**TypeScript/JavaScript (Jest):**
+```bash
+npx jest --onlyChanged
+```
+
+**Python:**
+```bash
+CHANGED=$(git diff --name-only origin/main...HEAD | grep '\.py$' | tr '\n' ' ')
+[ -n "$CHANGED" ] && python -m pytest $CHANGED -v || echo "sem arquivos Python alterados"
+```
+
+No CI (GitLab), use `rules: changes:` por serviço (ver skill `kubernetes`).
+Smoke de integração roda sempre, independente do diff.
 
 ## Convenções de nomenclatura
 
@@ -1829,115 +1805,8 @@ redirecionar).
 
 ### Outbox Pattern (obrigatório junto com mensageria)
 Quando mensageria for adotada, o Outbox Pattern é pré-requisito — garante
-que "gravou no banco" e "publicou o evento" são atômicos. Ver a seção
-"Dual Write problem" abaixo para o critério de identificação e o schema.
-
-## Dual Write problem (regra inegociável)
-
-**Definição:** dual write acontece quando uma única operação de negócio
-precisa gravar em dois sistemas que não compartilham transação — banco +
-fila, banco + cache, banco + API externa, banco + índice de busca. Não
-existe commit atômico entre eles: se o primeiro grava e o segundo falha,
-o sistema fica inconsistente sem ninguém perceber.
-
-```
-// ❌ Dual write — inconsistência silenciosa
-tx.Commit()                          // gravou o pedido
-publisher.Publish("pedido.criado")   // caiu aqui → evento perdido para sempre
-```
-
-O inverso é igualmente ruim: publicar antes do commit e o commit falhar
-gera evento para um pedido que não existe.
-
-### Como identificar (o arquiteto verifica em todo design.md)
-
-Pergunta única: **este use case grava em mais de um lugar durável dentro
-da mesma operação de negócio?** Se sim, é dual write. Casos típicos:
-
-| Situação | É dual write? |
-|---|---|
-| Salvar no banco + publicar evento em RabbitMQ/Kafka | sim |
-| Salvar no banco + invalidar/escrever no Redis | sim |
-| Salvar no banco + chamar API externa que altera estado | sim |
-| Salvar no banco + indexar no Elasticsearch | sim |
-| Salvar no banco + enviar e-mail | sim |
-| Salvar em duas tabelas do mesmo banco | não — uma transação resolve |
-| Salvar no banco + ler de uma API | não — leitura não cria inconsistência |
-
-### Solução padrão: Transactional Outbox
-
-Sempre que o dual write for identificado, a solução adotada é **Transactional
-Outbox** — sem exceção, sem discussão caso a caso. A escrita no banco e o
-registro da intenção de publicar acontecem na **mesma transação**; um
-processo separado (relay) publica depois.
-
-```
-┌─ transação única no Postgres ─────────────┐
-│  INSERT INTO pedido (...)                 │
-│  INSERT INTO outbox (evento, payload)     │
-└─ COMMIT ──────────────────────────────────┘
-                 ↓
-      relay lê outbox pendente
-                 ↓
-      publica no broker / chama a API externa
-                 ↓
-      marca a linha como publicada
-```
-
-**Tabela `outbox` — schema padrão (o `dba` cria):**
-
-```sql
-CREATE TABLE outbox (
-  id             UUID PRIMARY KEY,
-  agregado_tipo  TEXT        NOT NULL,   -- ex: 'pedido'
-  agregado_id    UUID        NOT NULL,
-  tipo_evento    TEXT        NOT NULL,   -- ex: 'pedido.criado'
-  payload        JSONB       NOT NULL,
-  criado_em      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  publicado_em   TIMESTAMPTZ,
-  tentativas     INT         NOT NULL DEFAULT 0,
-  ultimo_erro    TEXT
-);
-
-CREATE INDEX idx_outbox_pendente
-  ON outbox (criado_em)
-  WHERE publicado_em IS NULL;
-```
-
-O índice parcial mantém a varredura barata mesmo com a tabela grande —
-o relay só enxerga as linhas pendentes.
-
-### Regras de implementação (inegociáveis)
-
-- O use case **nunca** chama o broker, o cache ou a API externa direto.
-  Ele grava na `outbox` pela mesma conexão/transação do repositório.
-- O relay é um processo separado (goroutine, worker, cronjob) que lê
-  pendentes em lote, publica e marca `publicado_em`.
-- Concorrência entre réplicas resolvida com `SELECT ... FOR UPDATE SKIP
-  LOCKED` — nunca com lock em memória (o sistema é stateless por padrão).
-- Entrega é **at-least-once**: o consumidor precisa ser idempotente. Use
-  o `id` da linha da outbox como chave de deduplicação.
-- Falha de publicação incrementa `tentativas` e registra `ultimo_erro` —
-  a linha continua pendente, com backoff. Nunca deletar linha não publicada.
-- Linhas publicadas são expurgadas por rotina de retenção (ex: 30 dias),
-  nunca no mesmo fluxo do relay.
-- Métrica Prometheus obrigatória: `outbox_pendentes` (gauge) e
-  `outbox_publicados_total` (counter por `tipo_evento`). Backlog crescente
-  é sintoma de relay parado.
-
-### Quando o Outbox é overkill
-
-A escada de simplicidade (princípio 2) continua valendo. Antes de adotar:
-
-1. **Dá para eliminar a segunda escrita?** Cache com TTL curto invalidado
-   por leitura, em vez de escrita ativa → não há dual write.
-2. **A segunda escrita pode ser derivada do banco?** Um job que relê o
-   estado e reconcilia resolve casos de baixo volume sem outbox.
-3. **A perda do evento é tolerável?** Se a resposta é sim, o evento
-   provavelmente não deveria existir.
-
-Se nenhuma das três se aplica, o Outbox é a solução — registrar a decisão
-e o motivo no `design.md`.
+que "gravou no banco" e "publicou o evento" são atômicos. Sem isso, uma
+falha entre os dois cria inconsistência silenciosa.
 
 ## UI assíncrona por padrão (toda ação do usuário)
 
@@ -2059,7 +1928,7 @@ a barra dispara via `startNavigation()` ou `NavLink`.
 Toda funcionalidade entregue **precisa de testes** para ser considerada
 concluída — sem exceção. O `analista-requisitos` propõe os casos de teste
 como parte da spec; o `dev-fullstack` os implementa; o `qa-tester`
-valida de forma independente.
+valida de forma independente, rodando sempre a suíte completa.
 
 ### O que deve ser testado por camada
 
@@ -2067,7 +1936,9 @@ valida de forma independente.
 - Cada cenário Given/When/Then de spec.md tem um teste de use case
   correspondente.
 - Casos de borda identificados pelo analista (campo vazio, valor inválido,
-  usuário sem permissão) têm teste próprio.
+  usuário sem permissão) têm teste próprio. Cenários de permissão escritos
+  antes de o `dev-auth` existir ficam marcados "pendente de auth" no spec.md
+  e só rodam depois que o módulo de auth for entregue.
 - Comportamento com mensageria (se aplicável): teste verifica que o evento
   foi publicado, não só que o banco foi atualizado.
 
@@ -2077,7 +1948,8 @@ valida de forma independente.
 - Códigos de erro explícitos (400, 401, 403, 404, 409) verificados com
   payload de erro no formato padrão.
 
-**E2E com Playwright (obrigatório para funcionalidades com tela):**
+**E2E com Playwright — Fase Release** (ver "Estratégia de testes — três camadas").
+Cobre:
 - Fluxo principal completo com dados reais de spec.md.
 - Fluxos de erro visíveis (ex: formulário com campo obrigatório vazio,
   mensagem de erro aparece).
@@ -2223,164 +2095,6 @@ sem exigir novo login. Nunca expor o refresh token ao JavaScript.
 **O `security-reviewer` verifica ativamente:** qualquer uso de
 `localStorage.setItem`/`getItem` com token JWT = achado **Crítico**.
 
-## LGPD — tratamento de dado pessoal (regra inegociável)
-
-O template assume sistema que trata dado de pessoa identificada ou
-identificável. LGPD não é item de checklist do fim do projeto: é decisão de
-design que muda schema, API e tela. Quem levanta é o `analista-requisitos`;
-quem decide é o `arquiteto`; quem verifica é o `security-reviewer`.
-
-### Classificação — feita no spec.md, por campo
-
-Todo campo que identifica pessoa é classificado em uma das três faixas:
-
-| Faixa | Exemplos | Consequência |
-|---|---|---|
-| **Comum** | nome, e-mail corporativo, matrícula, telefone | acesso por ABAC, auditoria de leitura em massa |
-| **Sensível** (art. 5º, II) | saúde, biometria, origem racial, opinião política, filiação sindical, dado de criança/adolescente | acesso restrito por política explícita, auditoria de toda leitura individual, nunca em log |
-| **Identificador forte** | CPF, RG, CNH, título de eleitor | mascarado na listagem, completo só no detalhe e com permissão |
-
-O `analista-requisitos` registra a tabela de classificação no `spec.md`.
-Campo não classificado é tratado como sensível até que alguém decida.
-
-### Minimização — a pergunta que evita o problema
-
-Para cada campo pessoal proposto: **este dado é necessário para a
-finalidade, ou é bom ter?** Campo "bom ter" não entra. É a única mitigação
-que funciona, porque dado que não existe não vaza, não precisa de retenção
-e não aparece em pedido de titular.
-
-### Regras técnicas
-
-- **Log e auditoria nunca contêm dado sensível nem identificador forte.**
-  O campo `detalhes` da auditoria registra *qual campo* mudou, não o valor.
-  Já vale a regra do `dev-auditoria`; aqui ela vira exigência legal.
-- **Ambiente não-produtivo nunca recebe dado real.** O seed usa dado
-  fictício plausível. Se for indispensável usar massa de produção em
-  homologação, ela passa por anonimização irreversível antes da carga, e a
-  decisão fica registrada em `design.md`.
-- **Mascaramento na listagem:** CPF aparece como `***.456.789-**` no grid;
-  valor completo só na tela de detalhe e só para quem tem a permissão.
-- **Retenção:** toda entidade com dado pessoal declara por quanto tempo o
-  dado fica, e o que acontece depois (descarte, anonimização). Sem prazo
-  declarado, o dado fica para sempre, o que é o pior default possível.
-- **Direito do titular:** a arquitetura precisa conseguir responder
-  "quais dados vocês têm sobre mim" e "apague meus dados". A deleção
-  lógica padrão do projeto **não** atende ao direito de eliminação: nesse
-  caso específico o registro é anonimizado (campos pessoais sobrescritos,
-  chaves e histórico preservados) em vez de apenas marcado com
-  `excluido_em`. Ver a exceção já prevista na seção "Deleção lógica".
-- **Transferência para terceiro**, incluindo envio de conteúdo para API de
-  LLM, é decisão explícita registrada em `oportunidades-ia.md` ou
-  `design.md`, nunca implícita.
-
-### O que fica no spec.md de toda feature com dado pessoal
-
-```markdown
-## LGPD
-| Campo | Faixa | Finalidade | Retenção |
-|---|---|---|---|
-| cpf | identificador forte | identificar o requerente | 5 anos após o fim do processo |
-| nome | comum | contato | idem |
-
-- Base legal: <execução de política pública | obrigação legal | consentimento | legítimo interesse>
-- Dado sensível envolvido: sim/não — se sim, qual e por quê
-- Anonimização em não-produtivo: <como>
-```
-
-## Formato, fuso horário e locale (pt-BR)
-
-Sistema brasileiro erra data com uma regularidade impressionante, e o erro
-sempre aparece em produção, nunca no teste. As regras abaixo eliminam a
-classe inteira.
-
-### Armazenamento e transporte
-
-- **Banco:** `TIMESTAMPTZ`, sempre. Nunca `TIMESTAMP` sem fuso, nunca
-  `TEXT` com data formatada. O Postgres guarda em UTC e converte na leitura.
-- **API:** ISO 8601 com offset — `2026-03-15T14:30:00-03:00`. Nunca
-  `15/03/2026` no JSON. Formatação é responsabilidade da tela.
-- **Data pura** (aniversário, vencimento, competência), sem hora e sem
-  fuso: coluna `DATE` e string `2026-03-15` na API. Tratar data pura como
-  timestamp é o que faz o aniversário aparecer um dia antes.
-
-### Apresentação
-
-- Fuso de exibição padrão: `America/Sao_Paulo`, configurável por
-  `APP_TIMEZONE`. Sistema de alcance nacional exibe o fuso quando ele
-  importa (`14:30 (horário de Brasília)`).
-- Frontend formata com `Intl`, nunca com concatenação manual nem com
-  biblioteca de data só para formatar:
-
-```ts
-new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short',
-  timeZone: 'America/Sao_Paulo' }).format(new Date(iso))     // 15/03/2026 14:30
-new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-  .format(1234.5)                                             // R$ 1.234,50
-new Intl.NumberFormat('pt-BR').format(1234.567)               // 1.234,567
-```
-
-### Filtro por data — a armadilha
-
-"Processos de hoje" com servidor em UTC perde os registros das 21h às 24h
-de Brasília, ou inclui os de ontem, dependendo do lado. O filtro de intervalo
-é sempre resolvido no fuso de exibição e enviado à API como instante ISO
-completo:
-
-```
-tela: 15/03/2026
-API:  ?criado_de=2026-03-15T00:00:00-03:00&criado_ate=2026-03-15T23:59:59-03:00
-SQL:  WHERE criado_em >= $1 AND criado_em <= $2
-```
-
-Nunca `WHERE DATE(criado_em) = '2026-03-15'`: além do fuso errado, a função
-sobre a coluna invalida o índice.
-
-### Dinheiro e números
-
-- Valor monetário nunca é `float`. `NUMERIC(15,2)` no banco; inteiro em
-  centavos ou decimal de precisão arbitrária na aplicação. Ver Value Object
-  `Dinheiro` na seção de Value Objects.
-- Entrada do usuário aceita vírgula decimal e é normalizada antes de
-  validar.
-
-### Ordenação de texto
-
-Ordenação de nome próprio em português exige collation com acento correto:
-`ORDER BY nome COLLATE "pt-BR-x-icu"`. Sem isso, "Ávila" vai para depois de
-"Zebra".
-
-## Exportação de listagem (padrão, não improviso)
-
-Toda tela de grid acaba recebendo o pedido de exportar. A implementação
-ingênua (carregar tudo em memória e devolver na resposta HTTP) derruba o
-container no primeiro relatório grande.
-
-### Regras
-
-- **Formato padrão: CSV** (UTF-8 **com BOM**, separador `;`). Sem o BOM e
-  sem o ponto e vírgula, o Excel em português abre tudo em uma coluna e
-  quebra os acentos. XLSX só quando o usuário precisa de formatação ou
-  múltiplas abas; PDF só quando é documento para assinar ou arquivar, nunca
-  como formato de dados.
-- **A exportação respeita os filtros da tela**, não exporta a tabela
-  inteira. O endpoint reaproveita a mesma query da listagem, sem paginação.
-- **Streaming obrigatório**: cursor no banco e escrita direta na resposta,
-  linha a linha. Nunca montar a lista completa em memória.
-- **Limite explícito** de linhas (padrão: 50.000). Acima disso, a
-  exportação vira tarefa assíncrona: a API devolve `202` com id do job, o
-  arquivo vai para o armazenamento externo e o usuário recebe o link
-  quando fica pronto. Se o projeto tem mensageria, este é um caso de uso
-  natural dela.
-- **Colunas exportadas seguem as colunas visíveis** da tela, na mesma
-  ordem, com os mesmos rótulos em português.
-- **LGPD:** exportação de dado pessoal é evento auditado, com quantidade de
-  registros e filtros usados. Identificador forte sai mascarado, salvo
-  permissão específica.
-- **UX:** botão com `LoadingButton`, texto no gerúndio ("Exportando..."),
-  e toast ao concluir. Exportação assíncrona informa que o usuário será
-  avisado, sem travar a tela.
-
 ## Sistema de auditoria (duplo canal — local + syslog)
 
 Toda ação relevante do sistema é registrada em dois canais simultâneos:
@@ -2496,30 +2210,7 @@ dist/
 .angular/
 ```
 
-## Diagramas Mermaid — sintaxe e localização obrigatórias
-
-**Antes de escrever qualquer diagrama, ler `.claude/skills/mermaid/SKILL.md`.**
-Diagrama que não renderiza é defeito de entrega, não detalhe cosmético.
-
-As três regras que causam quase todas as falhas:
-
-1. **Aspas duplas em todo rótulo** de nó, aresta e subgraph — sempre, sem
-   avaliar caso a caso: `A["Gerar NF (fiscal)"]`. Sem aspas, parêntese e
-   chave dentro do rótulo são `Parse error`.
-2. **Nunca aspas duplas cruas dentro do rótulo** — usar `#quot;`, apóstrofo
-   simples, ou reescrever a frase. Isso não gera erro de parse: renderiza
-   truncado, o que é pior.
-3. **Quebra de linha é `<br/>`, nunca `\n`** — `\n` passa no parser e
-   aparece literalmente no diagrama renderizado.
-
-Antes de salvar, rodar o validador (usa o parser oficial do Mermaid):
-
-```bash
-npm install --no-save mermaid jsdom
-node examples/quality/validar-mermaid.mjs specs/<feature>/design.md
-```
-
-### Localização obrigatória
+## Diagramas Mermaid — localização obrigatória
 
 Todo diagrama gerado por qualquer agente é um bloco ` ```mermaid ``` `
 dentro de um arquivo `.md` e **fica em `specs/<feature>/`** — nunca em
@@ -2665,7 +2356,7 @@ Referência oficial: https://owasp.org/Top10/2025/
 Todo projeto tem `sonar-project.properties` na raiz e passa pelo
 SonarQube como **fase obrigatória do pipeline** (não opcional, não manual).
 Quality Gate mínimo: cobertura ≥ 80%, nenhum bug/vulnerabilidade nova de
-severidade Critical ou Blocker. O `dev-docker-compose` configura e mantém este pipeline.
+severidade Critical ou Blocker. O `dev-kubernetes` configura e mantém este pipeline.
 
 ### Ferramentas de qualidade para projetos JS/TS
 
@@ -2717,119 +2408,24 @@ npx stryker init
 Introduz mutações no código e verifica se os testes as detectam.
 Mutation score ≥ 70% é um indicador de testes de qualidade real.
 
-### Pipeline de CI — fases com as novas ferramentas
-
-As fases de lint e quality agora incluem as ferramentas acima para projetos JS/TS:
+### Pipeline de CI — stages
 
 ```
-lint-backend    → golangci-lint / flake8 / checkstyle / phpstan (por stack)
-lint-frontend   → biome ci . (JS/TS: lint + format)
-knip            → npx knip (código morto)
-arch-contract   → npx depcruise (contratos arquiteturais)
-docs-mermaid    → node examples/quality/validar-mermaid.mjs (diagramas renderizam)
-a11y            → npx playwright test e2e/acessibilidade/ (axe-core, WCAG 2.2 AA)
-test            → testes unitários + integração
-sonarqube       → Quality Gate
-build           → docker build
-security        → govulncheck / npm audit / dependabot
-push            → registry Harbor
-deploy-*        → GitOps ArgoCD
+lint → quality → test → sonarqube → build → security → push → deploy-dev → deploy-staging → deploy-prod
 ```
 
-## Rollback e incidente em produção
-
-Todo o fluxo do template trata de construir. Esta seção trata do dia em que
-algo quebra depois do deploy. O `arquiteto` coordena; o `dev-fullstack`
-executa; o `qa-tester` confirma.
-
-### Ordem de decisão (do mais rápido ao mais lento)
-
-```
-1. Reverter a imagem     → minutos. Sempre a primeira opção.
-2. Desligar por config   → minutos, se a feature está atrás de variável.
-3. Hotfix para frente    → horas. Só quando reverter é impossível.
-```
-
-**Reverter é o default.** Corrigir sob pressão, com usuário afetado e sem
-reprodução confiável, é como se produz o segundo incidente.
-
-### Reverter a aplicação
-
-O modelo GitOps do projeto torna isso um commit: alterar a tag da imagem em
-`deploy/k8s/overlays/prod/image.yaml` para a versão anterior e deixar o
-ArgoCD sincronizar. Sem `kubectl` manual, sem acesso ao cluster.
-
-### Reverter o banco — a parte difícil
-
-Migration de schema com `DROP COLUMN` **não é reversível na prática**: o
-`down` recria a coluna vazia, o dado se foi. Por isso a regra de deploy:
-
-- **Migration compatível para trás, sempre.** A versão nova do schema
-  precisa funcionar com a versão anterior da aplicação. Coluna nova nasce
-  nullable; coluna que sai é primeiro parada de ser usada, e só é removida
-  uma versão depois (padrão expand/contract).
-- Com essa regra, reverter a aplicação nunca exige reverter o banco. É a
-  única forma de o rollback ser rápido de verdade.
-- Se o incidente foi causado por dado corrompido, a correção é script de
-  DML pelo `dba` (ver "Modo 3 — Migração de dados"), não `down` de migration.
-
-### Depois que o serviço volta
-
-Registrar em `specs/incidentes/AAAA-MM-DD-<nome>.md`:
-
-```markdown
-# Incidente: <título>
-- Detectado em / Resolvido em / Duração
-- Impacto: quantos usuários, qual funcionalidade, houve perda de dado?
-- Causa raiz: (usar `.claude/skills/systematic-debugging/SKILL.md`)
-- Como foi contornado
-- O que impede a repetição: teste, alerta, regra em CLAUDE.md, revisão
-
-## Ações
-- [ ] <ação> — responsável — prazo
-```
-
-Sem culpados. O post-mortem serve para mudar o sistema, não a pessoa. Se
-uma ação vira regra permanente, ela entra no `CLAUDE.md` ou na skill
-correspondente — é assim que o template aprende.
-
-## Atualização de dependências
-
-A05/A03 do OWASP entram no projeto por dependência desatualizada, não por
-código novo. O ciclo:
-
-- **Detecção contínua:** a fase `security` do pipeline roda a varredura da
-  stack (`govulncheck`, `npm audit`, `pip-audit`, `composer audit`,
-  `dependency-check`). Falha o build em vulnerabilidade alta ou crítica com
-  correção disponível.
-- **Automação:** habilitar Renovate ou Dependabot no repositório, com
-  agrupamento de patch e minor em um PR semanal, e major em PR separado.
-- **Quem decide:** o `security-reviewer` reporta e classifica; o
-  `arquiteto` decide quando o bump é major ou tem breaking change; o
-  `dev-fullstack` executa e roda a suíte de testes.
-- **Regra de licença:** dependência nova tem a licença verificada antes de
-  entrar. Copyleft forte (GPL/AGPL) em projeto que não é GPL é bloqueio,
-  não observação.
-- **Nunca atualizar dependência junto com feature no mesmo PR.** Quando
-  algo quebra, ninguém sabe qual dos dois foi.
+`lint` e `quality` incluem golangci-lint/flake8/checkstyle/phpstan, `biome ci .`, `knip` e `depcruise` (JS/TS). Ver `kubernetes/SKILL.md` para detalhes.
 
 ## Issues, branches e Pull Requests — fluxo obrigatório
 
-**Toda tarefa começa com uma Issue. Nenhum branch é criado sem Issue.**
+Regras completas em `GIT_FLOW.md`. Resumo obrigatório:
 
-Três tipos: 🐛 `bug` (correção), ✨ `enhancement` (melhoria), 🚀 `feature` (nova função).
-
-**Branch sempre prefixado com o número da Issue:**
-```
-feature/42-cadastro-usuario
-fix/87-paginacao-overflow
-hotfix/99-csrf-token
-```
-
-**PR sempre referencia a Issue:**
-- Título: `feat: cadastro de usuário (#42)`
-- Corpo inclui `Closes #42` — fecha a Issue automaticamente no merge
-- Descrição: o que foi feito, como testar
+- Branches de trabalho sempre partem de `develop` (exceto `hotfix/*`, que parte de `main`)
+- Prefixo obrigatório com número da Issue: `feature/42-nome`, `fix/87-nome`, `hotfix/99-nome`
+- Toda mudança via Merge Request — push direto em `develop`, `staging` e `main` é bloqueado
+- Commits seguem Conventional Commits, validados por `commitlint`
+- Tag de release (`vMAJOR.MINOR.PATCH`) criada em `main` após homologação aprovada
+- Histórico de decisões: documentação reflete o estado vigente; o histórico fica nas tags git
 
 Os agentes não criam branches nem Issues diretamente — isso é responsabilidade
 do desenvolvedor humano. Mas ao comunicar o que foi implementado, o agente
@@ -2837,6 +2433,8 @@ deve informar qual Issue deve ser criada/atualizada e qual seria o título
 sugerido para o PR, seguindo o padrão Conventional Commits.
 
 
+
+## Hierarquia de autoridade
 
 Todo sistema multiagente precisa de uma cadeia de autoridade clara.
 Quando dois agentes discordam, ou quando um agente questiona a decisão de
@@ -3062,29 +2660,20 @@ silenciosamente ignorado nem aceito.
 - `arquiteto`: o método de consulta em `/usecase/query` recebe parâmetros
   de paginação/ordenação como parte da assinatura desde o desenho —
   nunca adicionado depois como afterthought.
-- `dev-fullstack`: implementa a allowlist de ordenação e o `LIMIT`/`OFFSET`
+- `dev-fullstack` (backend): implementa a allowlist de ordenação e o `LIMIT`/`OFFSET`
   (ou paginação por cursor, se o gatilho de volume justificar — ver
   Roadmap de Maturidade) na query real. Aplica a ordenação padrão definida
   em design.md quando a requisição não especificar `sort`/`order`.
 - `dba`: garante índice nas colunas mais usadas para ordenação/filtro —
   ordenar por coluna sem índice em tabela grande é o tipo de problema que
   só aparece em produção se ninguém pensar nisso agora.
-- `dev-fullstack`: implementa três comportamentos específicos, sempre
+- `dev-fullstack` (frontend): implementa três comportamentos específicos, sempre
   juntos:
-  1. **Clique no cabeçalho da coluna:** primeiro clique ordena
-     crescente; clicar de novo na mesma coluna alterna para decrescente
-     (toggle entre os dois — nunca um terceiro estado "sem ordenação",
-     já que sempre existe uma ordenação ativa). Clicar numa coluna
-     diferente troca a coluna ativa e volta para crescente.
+  1. **Clique no cabeçalho (toggle asc/desc):** Ver seção "Grid/listagem: comportamento obrigatório" neste arquivo.
   2. **Ordenação padrão aplicada sempre que a pesquisa é acionada** sem
      que o usuário tenha escolhido outra — a coluna/direção vêm de
      `design.md`/`ux.md`, nunca inventadas no código.
-  3. **Persistência entre visitas:** filtro, ordenação e paginação
-     (página atual, tamanho de página) são salvos em `localStorage` por
-     funcionalidade (chave única, ex: `grid-state:processos`) e
-     restaurados automaticamente quando o usuário volta à tela — sem
-     precisar reconfigurar filtro/ordenação a cada visita. Ver
-     implementação na skill de frontend.
+  3. **Persistência em localStorage:** Ver seção "Grid/listagem: comportamento obrigatório" neste arquivo.
 
 ### Gatilho para evoluir de paginação por página para paginação por cursor
 Registrado no Roadmap de Maturidade (ver tabela) — paginação por
@@ -3096,8 +2685,7 @@ por padrão.
 ## Autenticação em desenvolvimento e CORS
 
 **`APP_ENV` é a única variável que controla comportamentos de segurança.**
-Não existe mais `DEV_SEM_AUTH` ou qualquer outra variável separada —
-tudo é derivado de `APP_ENV=development` vs `APP_ENV=production`.
+Tudo é derivado de `APP_ENV=development` vs `APP_ENV=production`.
 
 | Comportamento | `APP_ENV=development` | `APP_ENV=production` |
 |---|---|---|
@@ -3121,7 +2709,7 @@ Em `production`: lista explícita de domínios reais — nunca `*`.
 | Arquivo | Quando usar | Comportamento |
 |---|---|---|
 | `docker-compose.dev.yml` | Desenvolvimento local | Volume montado com o código da máquina host; hot-reload ativo; sem build de imagem |
-| `docker-compose.yml` | Produção / CI | Build completo da imagem; sem volume de código; imagem auto-contida |
+| `docker-compose.yaml` | Produção / CI | Build completo da imagem; sem volume de código; imagem auto-contida |
 
 **Nunca misturar os dois** — adicionar volume de código no compose de produção anularia o propósito do build multi-stage. Nunca depender de `docker compose up --build` durante desenvolvimento — se o desenvolvedor precisa rebuildar pra ver uma mudança de código, o `docker-compose.dev.yml` está configurado incorretamente.
 
@@ -3134,30 +2722,30 @@ Em `production`: lista explícita de domínios reais — nunca `*`.
   tem HMR nativo) — o processo principal do container é o watcher, não
   o binário compilado estático.
 - Variável `APP_ENV=development` e `CORS_ALLOWED_ORIGINS` liberada para
-  desenvolvimento — presentes apenas aqui, nunca no `docker-compose.yml`.
+  desenvolvimento — presentes apenas aqui, nunca no `docker-compose.yaml`.
 - O serviço `migrate` e o serviço de seed também rodam aqui.
 
-### Regras do `docker-compose.yml` (produção)
+### Regras do `docker-compose.yaml` (produção)
 - Sem volume de código — a imagem é auto-contida (build multi-stage já
   copiou o código).
 - Sem `APP_ENV`, sem `CORS_ALLOWED_ORIGINS` permissiva.
 - Manifesto Kubernetes usa a mesma imagem produzida pelo Dockerfile
-  — o `docker-compose.yml` de produção e o manifesto K8s nunca divergem
+  — o `docker-compose.yaml` de produção e o manifesto K8s nunca divergem
   em qual imagem sobem.
 
 ### Comandos de desenvolvimento (sempre via dev compose)
 ```bash
 # subir o ambiente de desenvolvimento (sem build)
-docker compose -f docker-compose.dev.yml up
+docker compose -f docker-compose.yaml -f docker-compose.dev.yml up
 
 # rodar migration em dev
-docker compose -f docker-compose.dev.yml run --rm migrate
+docker compose -f docker-compose.yaml -f docker-compose.dev.yml run --rm migrate
 
 # rodar seed em dev
-docker compose -f docker-compose.dev.yml run --rm backend go run ./cmd/seed
+docker compose -f docker-compose.yaml -f docker-compose.dev.yml run --rm backend go run ./cmd/seed
 
 # rodar testes
-docker compose -f docker-compose.dev.yml run --rm backend go test ./... -cover
+docker compose -f docker-compose.yaml -f docker-compose.dev.yml run --rm backend go test ./... -cover
 ```
 
 ## Ferramental sempre dentro do container, nunca assumindo a máquina do desenvolvedor
@@ -3168,20 +2756,20 @@ assumindo que a máquina do desenvolvedor tem o toolchain instalado
 localmente. Isso é o que justifica usar Docker desde o início — se um
 comando só funciona porque o desenvolvedor tem Go/Node instalado
 localmente, o ambiente containerizado está incompleto.
-- Exemplo correto: `docker compose run --rm backend go mod tidy`
+- Exemplo correto: `docker compose -f docker-compose.yaml -f docker-compose.dev.yml run --rm backend go mod tidy`
 - Nunca: instruir o usuário a rodar `go mod tidy` na própria máquina como
   solução para erro de build no container.
 
 ## Migrations e seed (automáticos, nunca esquecidos)
 
 - **Migrations rodam automaticamente** ao subir o ambiente — via serviço
-  dedicado no `docker-compose.yml` que roda antes do backend subir
+  dedicado no `docker-compose.yaml` que roda antes do backend subir
   (`depends_on` com `condition: service_completed_successfully`), nunca
   dependendo do desenvolvedor lembrar de rodar manualmente.
 - **Script de seed obrigatório por entidade nova**, com dados de
   desenvolvimento plausíveis (nunca dado real) — local convencionado:
   `/internal/adapter/postgres/seed/` (ou equivalente da stack
-  configurada), executável via `docker compose run --rm backend
+  configurada), executável via `docker compose -f docker-compose.yaml -f docker-compose.dev.yml run --rm backend
   <comando de seed>`. O `dba` é responsável por garantir que toda
   entidade nova tenha seed correspondente — isso não é opcional nem
   "nice to have".
@@ -3197,7 +2785,7 @@ localmente, o ambiente containerizado está incompleto.
 |---|---|---|---|
 | **Unitário** | Use case isolado (`/usecase`), mockando `/port` | `dev-fullstack` (TDD — teste antes do código) | `qa-tester` confirma que existe e passa |
 | **Integração** | Handler + adapter real (ex: banco de teste) | `dev-fullstack` | `qa-tester` |
-| **E2E** | Fluxo completo pela UI, navegador real (Playwright) | `dev-fullstack`, a partir dos exemplos concretos de spec.md | `qa-tester` (independente de quem escreveu) |
+| **E2E** | Fluxo completo pela UI, navegador real (Playwright) | `dev-fullstack` na Fase Release, a partir dos exemplos concretos de spec.md | `qa-tester` (independente de quem escreveu) |
 | **Aceitação** | "Isso entrega o que o dono do produto pediu?" — mapeamento 1:1 entre cenário Given/When/Then de spec.md e teste que o verifica | N/A (é o resultado, não um teste novo) | `qa-tester` no `evidence.md` + revisão humana final do dono do produto |
 
 O teste de aceitação não é um artefato extra a mais — é a confirmação, em
@@ -3234,7 +2822,7 @@ etc. — não precisam de teste de carga por padrão.
 - **Toda spec.md inclui exemplos concretos com dados reais** para cada
   cenário — não apenas o Given/When/Then abstrato. Isso é responsabilidade
   do `analista-requisitos` ao coletar requisitos, e é o material-base que
-  o `dev-fullstack` usa para escrever testes E2E reais.
+  o `dev-fullstack` usa para escrever testes E2E reais na Fase Release.
 - **Construção e validação de teste E2E são papéis separados:** o
   `dev-fullstack` escreve os testes (Playwright); o `qa-tester`
   valida — revisa a qualidade do teste e roda — de forma independente.
@@ -3261,7 +2849,7 @@ dono do produto declara "finalizamos a versão X.Y"
         ↓
 arquiteto pergunta: "Registrar versão X.Y?"
         ↓ (usuário confirma)
-dba consolida migrations → specs/releases/vX.Y/release.sql (seções UP e DOWN)
+dba consolida migrations → specs/releases/vX.Y/release.sql
 tech-writer congela snapshot da API → specs/releases/vX.Y/openapi.yaml
 tech-writer atualiza CHANGELOG.md com a lista de features da versão
 specs/_status.md registra a versão como "lançada"
@@ -3276,9 +2864,9 @@ próximas features constroem sobre este baseline
 - Seed pode dropar e recriar o banco para reset rápido
 
 **A partir da primeira versão declarada**:
-- `specs/releases/vX.Y/release.sql` — arquivo único com a seção UP (estado
-  completo do banco nesta versão) e a seção DOWN (rollback para banco vazio)
-- Novos ambientes rodam a seção UP da versão mais recente + migrations
+- `specs/releases/vX.Y/release.sql` — seção `-- UP` com o estado completo do banco
+  nesta versão e seção `-- DOWN` com o rollback completo para banco vazio
+- Novos ambientes rodam a seção UP do `release.sql` da versão mais recente + migrations
   incrementais das features que vieram depois
 - Ambientes já em produção rodam só as migrations incrementais novas
 - **Seed vira idempotente**: só insere dados de referência que ainda não
@@ -3305,8 +2893,8 @@ e injetar `APP_VERSION` nas variáveis de ambiente do build.
 
 ### Duas consolidações de migration — momentos distintos
 
-**1. Antes da revisão** (código entra limpo no code review):
-`dba` consolida N migrations incrementais em 1 migration limpa.
+**1. Após o usuário testar e aprovar, antes da revisão** (código entra limpo
+no code review): `dba` consolida N migrations incrementais em 1 migration limpa.
 Migrations históricas são removidas da pasta `migrations/`.
 
 **2. Na fase release** (declaração de estabilidade):

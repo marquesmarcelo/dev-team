@@ -8,7 +8,7 @@
 
 ## O que é este template
 
-Um conjunto de **18 agentes e 18 skills** para Claude Code que transforma
+Um conjunto de **19 agentes e 17 skills** para Claude Code que transforma
 o desenvolvimento em um fluxo estruturado. Você atua como dono do produto;
 o time de agentes cuida do resto.
 
@@ -17,8 +17,10 @@ universais ficam em `CLAUDE.md`. As convenções de tecnologia ficam nas
 skills. Os agentes são pontes entre os dois — leem os documentos certos
 e entregam o artefato correto.
 
+**Distribuição de modelos:** `arquiteto-revisor` e `code-reviewer` rodam no Fable, porque fazem revisão crítica e se beneficiam de um modelo diferente do que produziu o artefato. Os demais agentes usam Opus.
+
 **Stacks suportadas nativamente:**
-- Backend: Go + Gin | Python + FastAPI | Java + Spring Boot | PHP + Laravel
+- Backend: Go + Gin | Python + FastAPI | Java + Spring Boot | PHP + Laravel | NestJS
 - Frontend: Next.js + shadcn/ui | Angular (+ DSGOV para sistemas públicos)
 - Banco: PostgreSQL | Infra: Docker + Kubernetes
 
@@ -35,18 +37,6 @@ observações de Andrej Karpathy sobre armadilhas de LLMs em código):
 | **Simplicidade primeiro** | Overengineering, abstrações desnecessárias, features especulativas |
 | **Mudanças cirúrgicas** | Refatorações não pedidas, alterações colaterais, limpeza indevida |
 | **Execução orientada a objetivos** | Critérios vagos que exigem clarificação constante |
-
-Duas regras universais que os agentes aplicam sem você precisar pedir:
-
-- **Dual write → Transactional Outbox.** Todo use case que grava no banco e
-  também publica evento, escreve em cache ou chama API externa que altera
-  estado é um dual write. O `arquiteto` marca isso no `design.md` e a
-  solução é sempre Outbox — o `code-reviewer` bloqueia se faltar.
-- **Conteúdo alinhado à esquerda, ocupando o espaço útil.** A área de
-  conteúdo começa junto ao menu lateral e vai até a margem direita.
-  Componentes consomem a largura disponível — tabela em largura total,
-  formulário em grid de 2-3 colunas no desktop. Nada de conteúdo
-  centralizado em coluna estreita no meio da tela.
 
 **O princípio mais impactante para o fluxo do projeto é o Goal-Driven:**
 em vez de dizer "implemente X", os agentes transformam cada task em um
@@ -66,68 +56,67 @@ de sucesso e deixa o agente iterar até concluir sem interrupções.
 
 ```mermaid
 flowchart TD
-    START(["Início"]) --> ANALISTA
+    START([Início]) --> ANALISTA
 
     subgraph ESPECIFICACAO["📋 Especificação"]
-        ANALISTA["analista-requisitos<br/>Visão + spec.md + wireframe"]
-        UX["ux-designer<br/>ux.md — filtros, campos,<br/>autocomplete, acessibilidade"]
-        AI_CONS["ai-consultor<br/>oportunidades-ia.md<br/>opcional"]
-        ARQUITETO["arquiteto<br/>design.md + tasks.md<br/>grupos de paralelismo"]
+        ANALISTA[analista-requisitos\nVisão + spec.md + wireframe]
+        UX[ux-designer\nux.md — filtros, campos,\nautocomplete, acessibilidade]
+        AI_CONS[ai-consultor\noportunidades-ia.md\nopcional]
+        ARQUITETO[arquiteto\ndesign.md + tasks.md\ngrupos de paralelismo]
     end
 
     subgraph IMPLEMENTACAO["⚙️ Implementação"]
-        FS_A["dev-fullstack<br/>feature A"]
-        FS_B["dev-fullstack<br/>feature B"]
-        FS_N["dev-fullstack<br/>feature N"]
+        FS_A[dev-fullstack\nfeature A]
+        FS_B[dev-fullstack\nfeature B]
+        FS_N[dev-fullstack\nfeature N]
     end
 
     subgraph VALIDACAO_MANUAL["✋ Validação manual (obrigatória)"]
-        TESTE["Usuário testa<br/>docker compose up"]
-        APROVA{"Aprovado?"}
+        TESTE[Usuário testa\ndocker compose up]
+        APROVA{Aprovado?}
     end
 
     subgraph REVISAO["🔍 Revisão"]
-        SEC["security-reviewer<br/>OWASP Top 10"]
-        CODE["code-reviewer<br/>qualidade + arquitetura"]
-        QA["qa-tester<br/>executa testes<br/>evidence.md"]
+        SEC[security-reviewer\nOWASP Top 10]
+        CODE[code-reviewer\nqualidade + arquitetura]
+        QA[qa-tester\nexecuta testes\nevidence.md]
     end
 
     subgraph FINALIZACAO["📦 Finalização"]
-        TW["tech-writer<br/>openapi.yaml<br/>diagrama-banco.md"]
-        DC["dev-docker-compose<br/>Dockerfiles + Compose"]
-        K8S["dev-kubernetes<br/>K8s + ArgoCD + GitLab CI<br/>opcional"]
+        TW[tech-writer\nopenapi.yaml\ndiagrama-banco.md]
+        DC[dev-docker-compose\nDockerfiles + Compose]
+    K8S[dev-kubernetes\nK8s + ArgoCD + GitLab CI\nopcional]
     end
 
-    ANALISTA -->|"PARA - valide"| USUARIO_V1{"Aprovado?"}
-    USUARIO_V1 -->|"Sim"| UX
-    USUARIO_V1 -->|"Ajustar"| ANALISTA
+    ANALISTA -->|PARA - valide| USUARIO_V1{Aprovado?}
+    USUARIO_V1 -->|Sim| UX
+    USUARIO_V1 -->|Ajustar| ANALISTA
 
-    UX -->|"PARA - valide"| USUARIO_V2{"Aprovado?"}
-    USUARIO_V2 -->|"Sim"| AI_CONS
-    USUARIO_V2 -->|"Ajustar"| UX
+    UX -->|PARA - valide| USUARIO_V2{Aprovado?}
+    USUARIO_V2 -->|Sim| AI_CONS
+    USUARIO_V2 -->|Ajustar| UX
     AI_CONS --> ARQUITETO
 
-    ARQUITETO -->|"PARA - valide<br/>tasks.md + grupos"| USUARIO_V3{"Aprovado?"}
-    USUARIO_V3 -->|"Ajustar"| ARQUITETO
-    USUARIO_V3 -->|"Sim - dispara<br/>em paralelo"| FS_A & FS_B & FS_N
+    ARQUITETO -->|PARA - valide\ntasks.md + grupos| USUARIO_V3{Aprovado?}
+    USUARIO_V3 -->|Ajustar| ARQUITETO
+    USUARIO_V3 -->|Sim - dispara\nem paralelo| FS_A & FS_B & FS_N
 
     FS_A --> TESTE
     FS_B --> TESTE
     FS_N --> TESTE
 
     TESTE --> APROVA
-    APROVA -->|"Não — corrigir"| FS_A
-    APROVA -->|"Sim"| SEC & CODE
+    APROVA -->|Não — corrigir| FS_A
+    APROVA -->|Sim| SEC & CODE
 
     SEC --> QA
     CODE --> QA
 
-    QA -->|"PARA - valide<br/>evidence.md"| USUARIO_V4{"Aprovado?"}
-    USUARIO_V4 -->|"Não"| FS_A
-    USUARIO_V4 -->|"Sim"| TW
-    TW --> DC
-    DC --> K8S
-    K8S --> FIM(["Produção 🚀"])
+    QA -->|PARA - valide\nevidence.md| USUARIO_V4{Aprovado?}
+    USUARIO_V4 -->|Não| FS_A
+    USUARIO_V4 -->|Sim| TW
+    TW --> K8S
+    K8S --> FIM([Produção 🚀])
 
     style ESPECIFICACAO fill:#e8f4f8,stroke:#2980b9
     style IMPLEMENTACAO fill:#e8f8e8,stroke:#27ae60
@@ -230,19 +219,20 @@ Ao terminar, **para e aguarda sua validação** — nunca aciona revisão sozinh
 
 ---
 
-### Passo 6.5 — Consolidação de migrations + validação manual
+### Passo 6.5 — Validação manual + consolidação de migrations
 
-Antes de qualquer revisão, **dois passos obrigatórios**:
+Antes de qualquer revisão, nesta ordem:
 
-1. **`dba` consolida as migrations** — N arquivos incrementais viram 1 limpo
-2. **Você testa** no ambiente de desenvolvimento:
+1. **Você testa** no ambiente de desenvolvimento (migrations ainda por feature):
    ```bash
    docker compose -f docker-compose.yaml -f docker-compose.dev.yml up
    ```
 
 Depois diga:
-- **"Aprovado"** → o arquiteto aciona a revisão
+- **"Aprovado"** → o `dba` consolida as migrations (N arquivos incrementais viram 1 limpo) e o arquiteto aciona a revisão
 - **"Tem problemas: X"** → o `dev-fullstack` corrige, você testa de novo
+
+2. **`dba` consolida as migrations** — só depois do seu "Aprovado". Na Fase Release ele gera o `release.sql`.
 
 > A consolidação garante que os reviewers leem código limpo, não histórico de dev.
 
@@ -359,11 +349,13 @@ O projeto usa **ArgoCD central** que gerencia múltiplos clusters:
 Os nomes dos ambientes (`dev`, `staging`, `prod`) são defaults
 parametrizáveis via variáveis de ambiente no GitLab.
 
-### Pipeline GitLab CI/CD (9 fases)
+### Pipeline GitLab CI/CD (10 fases)
 
 ```
-lint → test → sonarqube → build → security → push → deploy-dev → deploy-staging → deploy-prod
+lint → quality → test → sonarqube → build → security → push → deploy-dev → deploy-staging → deploy-prod
 ```
+
+Detalhes de cada job em `.claude/skills/kubernetes/SKILL.md`.
 
 As fases de deploy não rodam `kubectl apply` — elas atualizam a tag da
 imagem no arquivo `deploy/k8s/overlays/<env>/image.yaml` via commit Git.
@@ -415,7 +407,7 @@ Ver `CLAUDE.md` seção "Hierarquia de autoridade" para o protocolo completo.
 
 ---
 
-## Referência: os 18 agentes
+## Referência: os 19 agentes
 
 ### Descoberta e especificação
 
@@ -425,6 +417,7 @@ Ver `CLAUDE.md` seção "Hierarquia de autoridade" para o protocolo completo.
 | `ux-designer` | Projeta fluxo, estados e acessibilidade | `specs/<feature>/ux.md` |
 | `ai-consultor` | Sugere oportunidades de IA | `specs/<feature>/oportunidades-ia.md` |
 | `arquiteto` | Design técnico e coordenação do time | `specs/<feature>/design.md` + `tasks.md` |
+| `arquiteto-revisor` | Revisão crítica do design.md — acionado após o arquiteto | Achados sobre o `design.md` |
 
 ### Implementação
 
@@ -452,18 +445,11 @@ Ver `CLAUDE.md` seção "Hierarquia de autoridade" para o protocolo completo.
 
 ---
 
-## Referência: as 18 skills
+## Referência: as 17 skills
 
 Skills são lidas pelos agentes antes de implementar. Contêm as convenções
 específicas de cada tecnologia — nunca as regras universais (essas ficam
 em `CLAUDE.md`).
-
-**Skills grandes usam divulgação progressiva.** As duas skills de frontend
-têm `SKILL.md` curto (o índice e as regras que valem sempre) e uma pasta
-`reference/` com o detalhe por área — AppShell, grid, formulários, estados,
-build. O agente lê o índice e carrega só a referência da área em que vai
-trabalhar. Antes, a skill inteira ocupava cerca de 25 mil tokens de
-contexto por sessão; hoje ocupa uma fração disso.
 
 | Skill | Tecnologia | O que cobre |
 |---|---|---|
@@ -481,8 +467,8 @@ contexto por sessão; hoje ocupa uma fração disso.
 | `load-testing-k6` | k6 | Scripts com thresholds, execução via Docker, envio para Prometheus |
 | `mcp-server` | TypeScript / Python | Servidor MCP: estrutura de projeto, SDK, transporte STDIO/SSE, autenticação, Dockerfiles |
 | `dataviz` | Recharts (Next.js), ECharts (Angular), Chart.js (universal) | Gráficos, dashboards e visualizações de dados. Protocolo de decisão (qual gráfico), princípios Tufte + NYT Graphics, anti-padrões, acessibilidade |
-| `mermaid` | Mermaid.js | Sintaxe segura de diagrama (aspas obrigatórias em rótulo, `<br/>` para quebra, escape por entidade, palavras reservadas) + validador que roda o parser oficial antes de salvar |
 | `systematic-debugging` | Qualquer stack | Debug em 4 fases: reprodução → causa raiz → hipótese → correção. Baseado no Superpowers (Jesse Vincent) |
+| `kubernetes` | Kubernetes + ArgoCD + GitLab CI | Kustomize (base + overlays), ApplicationSet ArgoCD multi-cluster, .gitlab-ci.yml GitOps |
 | `geo` | PostGIS + Leaflet + GeoServer | Dados geográficos: tipos PostGIS, SIRGAS 2000 (EPSG:4674), API GeoJSON, Leaflet, GeoServer WMS/WFS opcional, fontes IBGE/CONCAR. Ativado via `Geo: sim` em `project.config.md` |
 
 ### Documentação de referência (`.claude/references/`)
